@@ -1,0 +1,169 @@
+5400                 jmp      r0
+0200000019000440     csel     r0l, 0.0, u8, r0l, r0l, ext1, fgt
+5404                 jmp      r2
+0200000051040140     csel     r0l, 0.0, u8l.abs, 4, r0l, fgt
+5421                 jmp      r16, link
+3e0105400f06         intl     r0, 69, ^r90l
+0401                 call     r0, link
+5432                 jmp      r25
+0300200810040a33     ria_bbox_test 56118110849056
+5401                 jmp      r0, link
+0219200011000040     csel     r6, 0.5, u8l, r0, r0, fgt
+20004100             jmp_if_skipping_doorbell 65
+5436                 jmp      r27
+5405                 jmp      r2, link
+5402                 jmp      r1
+20009100             jmp_if_skipping_doorbell 145
+2000c100             jmp_if_skipping_doorbell 193
+4a392205             floor    r14, u17l.abs, sat
+021c200011010040     csel     r7l, 0.5, u8l, r0h, r0l, fgt
+031c200001010040     ria_commit 70368761020448
+aa3d2205             fadd     $r15, u17l.abs, 0.0
+021e200011010040     csel     r7h, 0.5, u8l, r0h, r0l, fgt
+2a50c700             fadd     r20l, ^r3h, 0.0
+0a412205             floor    r16, u17l.abs
+2a40e700             fadd     r16l, ^r19h, 0.0
+0220200011010040     csel     r8l, 0.5, u8l, r0h, r0l, fgt
+1a642380             fmul     r25l, 0.59375, 0.125
+0402                 call     r1
+3a52c7002281         ffma     r20h, ^r3h, r16, $r0h
+3a42e7002281         ffma     r16h, ^r19h, r16, $r0h
+3a6623800600         ffma     r25h, 0.59375, r20l, 0.0
+4a5ac700             floor    r22h, ^r3h, sat
+2a452205             fadd     r17, u17l.abs, 0.0
+0222200011010040     csel     r8h, 0.5, u8l, r0h, r0l, fgt
+ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
+4a44e700             floor    r17l, ^r19h, sat
+5a682380             fmul     r26l, 0.59375, 0.125, sat
+0314c88c11044a49     ria_curve_test 80582244666568
+5a44e700             fmul     r17l, ^r19h, 0.0, sat
+0224200011010040     csel     r9l, 0.5, u8l, r0h, r0l, fgt
+5a6a2380             fmul     r26h, 0.59375, 0.125, sat
+4a4d2205             floor    r19, u17l.abs, sat
+5a54e700             fmul     r21l, ^r19h, 0.0, sat
+6a44e700             fadd     r17l, ^r19h, 0.0, sat
+6a58c700             fadd     r22l, ^r3h, 0.0, sat
+7a4ac7002281         ffma     r18h, ^r3h, r16, $r0h, sat
+5a6c2380             fmul     r27l, 0.59375, 0.125, sat
+031cc88c1104aa51     ria_commit 89790654549192
+7a50c7002281         ffma     r20l, ^r3h, r16, $r0h, sat
+8a42c700             floor    $r16h, ^r3h
+42000e000000         if       0.21875, 0.0, 0, feq
+41010040             zs_emit  0, r0l
+0400                 call     r0
+3a5c658406a2         ffma     r23l, r18h.abs, r20l, $r17l
+0419                 call     r12, link
+1402                 ret      r1
+e239f2e2a78a         ldimm    $r14, 2326258418
+2a612284             fadd     r24, 0.5625.abs, 0.125
+e23df2e0a78a         ldimm    $r15, 2326257906
+e24112dee78a         ldimm    $r16, 2330451474
+fadea58406a60702     ffma     $r23h, $r18h.abs, r84l, sat
+2ae122860402         fadd     r24, r17.abs, r68l
+e24512dee78a         ldimm    $r17, 2330451474
+e249f2e0a78a         ldimm    $r18, 2326257906
+e24d12dee78a         ldimm    $r19, 2330451474
+e25112dee78a         ldimm    $r20, 2330451474
+030060c914042ad9     ria_bbox_test 238774480324960
+0300040000000000     ria_bbox_test 4
+1400                 ret      r0
+1464                 ret      r50
+00c008006702         jmp_any  40304648
+0800                 trap
+0410                 call     r8
+04c0                 call     r96
+fe0c0e0c0000         mov_a    $r3l, 14
+9a702d80             fmul     $r28l, 0.90625, 0.125
+be040e0c0000         ffs      $r1l, 14
+be02120c0000         ffs      $r0h, 18
+8a5e2d80             rcp      $r23h, 0.90625
+1414                 ret      r10
+fe100e0c0000         mov_a    $r4l, 14
+fe0c120c0000         mov_a    $r3l, 18
+fe7a0e080000         andn2    $r30h, 14, 0
+16180000             hmul     r6l, 0.0, 0.0
+5a0a2d80             fmul     r2h, 0.90625, 0.125, sat
+627925992281         ldimm    r30, 2166528293
+161d0000             hmul     _, 0.0, 0.0
+fe761e080000         andn2    $r29h, 30, 0
+fe760e080000         andn2    $r29h, 14, 0
+8a70ed80             rcp      $r28l, ^r22h
+fe7412080000         andn2    $r29l, 18, 0
+0300b82e120012d9     ria_bbox_test 238671333830328
+be620e080000         popcnt   $r24h, 14
+0314b82e1200e35c     ria_curve_test 102130028523192
+be5e0e080000         popcnt   $r23h, 14
+031cb82e1200e35c     ria_commit 102130028523192
+be600e080000         popcnt   $r24l, 14
+4a624d80             rcp      r24h, r6h, sat
+030058cd10042a59     ria_bbox_test 98036991708504
+4a5d2380             rcp      r23, 0.59375, sat
+4a5d2280             rcp      r23, 0.5625, sat
+031c210041020010     ria_commit 17592223858721
+1e0705200f062401     imadd    dr1, 5, ^r57l, 6.sx, lsl 4
+1e0cff0fa7005410     imsub    r35l, r24, 64.sx, lsl 3
+031c1200f0120500     ria_commit 21792555026
+1e0cff0f27005410     imsub    r35l, r24, 64.sx, lsl 2
+031c3284f0140d00     ria_commit 56185881650
+031c3200f0120500     ria_commit 21792555058
+031c1804f0110500     ria_commit 21775778840
+0300002913013b07     ria_bbox_test 7950002497792
+2e00010800000000     shlhi    r0l, 1, 0, 0, 0
+030008a817059f01     ria_bbox_test 1782496864264
+0a045505             floor    r1l, u138h.abs
+03000800e0260a00     ria_bbox_test 43601887240
+2e85020000000000     bfeil    r1, 2, 0, 0, 0
+2e91020000000000     bfeil    r4, 2, 0, 0, 0
+0a00f010             rsqrts   r0l, ^r24l
+840e                 call     r7, mode
+2888                 doorbell 136
+2800                 doorbell 0
+0a000000             floor    r0l, 0.0
+8410                 call     r8, mode
+2804                 doorbell 4
+6800                 barrier
+288c                 doorbell 140
+03145c046b0d2ebd     ria_curve_test 208005491262556
+03145c046b0d2e3d     ria_curve_test 67268002907228
+28a8                 doorbell 168
+16099482             hmul     _, $r10l.abs, 0.125
+2810                 doorbell 16
+1406                 ret      r3
+1426                 ret      r19
+14f8                 ret      r124
+2824                 doorbell 36
+1403                 ret      r1, link
+050010040044         load     , dr0, lsl 1, i8, none, a
+050010050044         load     , dr0, 1, lsl 1, i8, none, a
+050010060044         load     , dr0, lsl 1, i8, none, a
+050010070044         load     , dr0, 1, lsl 1, i8, none, a
+0500100c0044         load     , du0, lsl 1, i8, none, a
+0500100d0044         load     , du0, 1, lsl 1, i8, none, a
+0500100e0044         load     , du0, lsl 1, i8, none, a
+8500300f0044         load     , du0, 3, lsl 1, i16, none, a
+2e3d020400000000     extr     r15, 2, 0, 0, 0
+11042a85             st_var   r33, r53l
+0314e87aa20c8b8d     ria_curve_test 155628351945448
+0314005822128b8d     ria_curve_test 155628444211200
+268016022029         hadd     r64l, r75l.abs, r32l.abs
+268006022029         hadd     r64l, r67l.abs, r32l.abs
+3e1502090000         popcnt   r5, u1l
+264d0200             hadd     _, 0.03125, 0.0
+031438a817059f00     ria_curve_test 682985236536
+8a152b80             rcp      $r5, 0.84375
+21001900             iter     r0l_r0h_r1l_r1h, cf25
+00c00c001707         jmp_any  118947852
+268016032029         hadd     r64l, u75l.abs, r32l.abs
+268006032029         hadd     r64l, u67l.abs, r32l.abs
+3e1102090000         popcnt   r4, u1l
+03143811f0150d00     ria_curve_test 56202629432
+0a152b80             rcp      r5, 0.84375
+26000000             hadd     r0l, 0.0, 0.0
+0a012b80             rcp      r0, 0.84375
+11042a8b             st_var   r97, r85l
+564e0302             hmul     r19h, r1h.abs, 0.0, sat
+56100601             hmul     r4l, u3l, 0.0, sat
+20005900             jmp_if_skipping_doorbell 89
+560a0800             hmul     r2h, 0.125, 0.0, sat
+560a0500             hmul     r2h, 0.078125, 0.0, sat
+56020500             hmul     r0h, 0.078125, 0.0, sat

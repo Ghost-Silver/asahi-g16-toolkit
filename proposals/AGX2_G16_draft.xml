@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Apple Silicon G16 GPU ISA Extension Proposals for Mesa AGX2.xml
+  Derived from automated scanning of macOS G16 driver binaries (AGXMetalG16X.bundle).
+  Architecture: Apple G16 (M3 / M3 Pro / M3 Max)
+-->
+<isa name="AGX2_G16_EXTENSIONS">
+
+  <!-- ===================================================================== -->
+  <!-- 1. Register hint: Support value 0 for unhinted operands in G16        -->
+  <!-- ===================================================================== -->
+  <!--
+    Observation: Operands in Apple G16 binaries encode hint = 0 for standard
+    unhinted registers, whereas G13/G14 binaries encoded hint = 1.
+    Recommendation: Update Register hint enum to accept 0 as default/none.
+  -->
+  <enum kind="hint" name="Register hint (G16 Update)">
+    <value value="0" default="true">none</value>
+    <value value="1">none_legacy</value>
+    <value value="2" display="$">cache</value>
+    <value value="3" display="^">discard</value>
+  </enum>
+
+  <!-- ===================================================================== -->
+  <!-- 2. Indirect Register Jump & Branch Flags (Jump indirect group)         -->
+  <!-- ===================================================================== -->
+  <!--
+    Observation:
+    - Opcode 0x54 (1010100) with bit 9:15=exreg32 is the register indirect jump
+      (jmp_reg), completing the indirect flow control trio:
+        * 0000100 (0x04): call_reg
+        * 0010100 (0x14): ret
+        * 1010100 (0x54): jmp_reg
+    - Bit 8 is set in call_reg for subroutine link / indirect call mode.
+    - Bit 7 is set as an indirect target mode / alternate branch flag.
+  -->
+  <group name="Jump indirect G16" length="2">
+    <exact bit="0:6">opcode</exact>
+    <modifier name="mode" bit="7" display="alt"/>
+    <modifier name="link" bit="8" display="link"/>
+    <src kind="exreg32" bit="9:15"/>
+
+    <ins name="call_reg" opcode="0000100" display="call"/>
+    <ins name="ret"      opcode="0010100"/>
+    <ins name="jmp_reg"  opcode="1010100" display="jmp"/>
+  </group>
+
+  <!-- ===================================================================== -->
+  <!-- 3. Extended Select / csel Modifiers (Bits 49, 50, 66)                -->
+  <!-- ===================================================================== -->
+  <!--
+    Observation: In G16 10-byte csel instructions (fcsel/icsel), bits 49, 50,
+    and 66 are frequently set. These control FP16/FP32 precision selection
+    and conditional formatting.
+  -->
+  <modifier name="csel_ext_cond" bit="49:50 66"/>
+
+  <!-- ===================================================================== -->
+  <!-- 4. Hardware Raytracing Acceleration (RIA2 - Domain 0b011)             -->
+  <!-- ===================================================================== -->
+  <!--
+    Observation: In G13/G14, Domain 0b011 (bits 0:2 == 3) had no instructions.
+    In G16, Domain 0b011 is heavily populated by:
+      - 0x0003: Bounding box traversal test (agx.bounding_box_test)
+      - 0x1403: Curve coarse intersection test (agx.cliqueS_coarse_curve_test)
+      - 0x1c03: Temporal split / BVH commit (agx.cliqueS_temporal_split)
+  -->
+  <group name="Raytracing RIA2" length="8">
+    <exact bit="0:2">011</exact>
+    <ins name="ria_bbox_test"   opcode="0000000000000011"/>
+    <ins name="ria_curve_test"  opcode="0001010000000011"/>
+    <ins name="ria_split"       opcode="0001110000000011"/>
+  </group>
+
+  <!-- ===================================================================== -->
+  <!-- 5. Integer ALU & Logic Extensions (Domain 0b110)                      -->
+  <!-- ===================================================================== -->
+  <!--
+    Observation: Opcode 0x0006 is the most frequent unknown integer opcode in G16.
+  -->
+  <group name="Integer Extended G16" length="4/8">
+    <exact bit="0:2">110</exact>
+    <!-- Opcode 0x0006 candidate for expanded 64-bit integer ops -->
+  </group>
+
+  <!-- ===================================================================== -->
+  <!-- 6. Subgroup / Quad SIMD Extensions (Domain 0b111)                     -->
+  <!-- ===================================================================== -->
+  <!--
+    Observation:
+      - 0x019f: SIMD/Subgroup extended reduction / shuffle
+      - 0x010f: Quad-level ballot / permute vote
+  -->
+  <group name="Subgroup SIMD G16" length="4/8">
+    <exact bit="0:2">111</exact>
+    <!-- Opcode prefixes 0x019f and 0x010f -->
+  </group>
+
+</isa>

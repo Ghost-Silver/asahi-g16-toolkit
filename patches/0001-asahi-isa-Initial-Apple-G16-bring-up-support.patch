@@ -1,0 +1,299 @@
+From a759a18ddbffe55a143c89023cbb283eb4b3a26e Mon Sep 17 00:00:00 2001
+From: Ghost-Silver <cyf31415@yeah.net>
+Date: Sat, 31 Oct 2026 11:05:55 +0800
+Subject: [PATCH 1/2] asahi/isa: Initial Apple G16 bring-up support
+
+- Allow register hint=0 for unhinted operands in G16 binaries
+- Add G16 jmp_reg indirect register jump (opcode 0x54) to Jump indirect group
+- Add 250 real-world G16 disassembler test vectors mined from M3 Pro driver binaries
+---
+ src/asahi/isa/AGX2.xml           |   1 +
+ src/asahi/isa/test/disasm.py     |   2 +-
+ src/asahi/isa/test/g16_cases.txt | 250 +++++++++++++++++++++++++++++++
+ 3 files changed, 252 insertions(+), 1 deletion(-)
+ create mode 100644 src/asahi/isa/test/g16_cases.txt
+
+diff --git a/src/asahi/isa/AGX2.xml b/src/asahi/isa/AGX2.xml
+index f3e6733..d99bf55 100644
+--- a/src/asahi/isa/AGX2.xml
++++ b/src/asahi/isa/AGX2.xml
+@@ -1121,6 +1121,7 @@
+ 
+     <ins name="ret"      opcode="0010100"/>
+     <ins name="call_reg" opcode="0000100" display="call"/>
++    <ins name="jmp_reg"  opcode="1010100" display="jmp"/>
+   </group>
+ 
+   <group name="Jump direct" length="6">
+diff --git a/src/asahi/isa/test/disasm.py b/src/asahi/isa/test/disasm.py
+index fdc9c5d..b45bf0e 100644
+--- a/src/asahi/isa/test/disasm.py
++++ b/src/asahi/isa/test/disasm.py
+@@ -63,7 +63,7 @@ def operand(desc, length):
+         elif hint == 2:
+             cache = True
+         else:
+-            assert(hint == 1)
++            assert(hint in [0, 1])
+ 
+     assert(not (cache and discard))
+     hint = '^' if discard else '$' if cache else ''
+diff --git a/src/asahi/isa/test/g16_cases.txt b/src/asahi/isa/test/g16_cases.txt
+new file mode 100644
+index 0000000..615d99f
+--- /dev/null
++++ b/src/asahi/isa/test/g16_cases.txt
+@@ -0,0 +1,250 @@
++5400                 jmp      r0
++5404                 jmp      r2
++0200000051040140     csel     r0l, 0.0, u8l.abs, 4, r0l, fgt
++3e0105400f06         intl     r0, 69, ^r90l
++5432                 jmp      r25
++0219200011000040     csel     r6, 0.5, u8l, r0, r0, fgt
++20004100             jmp_if_skipping_doorbell 65
++5436                 jmp      r27
++5402                 jmp      r1
++20009100             jmp_if_skipping_doorbell 145
++2000c100             jmp_if_skipping_doorbell 193
++5438                 jmp      r28
++4a392205             floor    r14, u17l.abs, sat
++021c200011010040     csel     r7l, 0.5, u8l, r0h, r0l, fgt
++543a                 jmp      r29
++5406                 jmp      r3
++aa3d2205             fadd     $r15, u17l.abs, 0.0
++021e200011010040     csel     r7h, 0.5, u8l, r0h, r0l, fgt
++2a50c700             fadd     r20l, ^r3h, 0.0
++0a412205             floor    r16, u17l.abs
++2a40e700             fadd     r16l, ^r19h, 0.0
++0220200011010040     csel     r8l, 0.5, u8l, r0h, r0l, fgt
++1a642380             fmul     r25l, 0.59375, 0.125
++0402                 call     r1
++3a52c7002281         ffma     r20h, ^r3h, r16, $r0h
++3a42e7002281         ffma     r16h, ^r19h, r16, $r0h
++3a6623800600         ffma     r25h, 0.59375, r20l, 0.0
++4a5ac700             floor    r22h, ^r3h, sat
++2a452205             fadd     r17, u17l.abs, 0.0
++0222200011010040     csel     r8h, 0.5, u8l, r0h, r0l, fgt
++ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
++4a44e700             floor    r17l, ^r19h, sat
++5a682380             fmul     r26l, 0.59375, 0.125, sat
++4a492205             floor    r18, u17l.abs, sat
++5a44e700             fmul     r17l, ^r19h, 0.0, sat
++0224200011010040     csel     r9l, 0.5, u8l, r0h, r0l, fgt
++5a6a2380             fmul     r26h, 0.59375, 0.125, sat
++4a4d2205             floor    r19, u17l.abs, sat
++5a54e700             fmul     r21l, ^r19h, 0.0, sat
++0226200011010040     csel     r9h, 0.5, u8l, r0h, r0l, fgt
++6a44e700             fadd     r17l, ^r19h, 0.0, sat
++6a58c700             fadd     r22l, ^r3h, 0.0, sat
++7a4ac7002281         ffma     r18h, ^r3h, r16, $r0h, sat
++5a6c2380             fmul     r27l, 0.59375, 0.125, sat
++aa512205             fadd     $r20, u17l.abs, 0.0
++7a50c7002281         ffma     r20l, ^r3h, r16, $r0h, sat
++8a42c700             floor    $r16h, ^r3h
++42000e000000         if       0.21875, 0.0, 0, feq
++41010040             zs_emit  0, r0l
++0400                 call     r0
++3a5c658406a2         ffma     r23l, r18h.abs, r20l, $r17l
++1402                 ret      r1
++e239f2e2a78a         ldimm    $r14, 2326258418
++2a612284             fadd     r24, 0.5625.abs, 0.125
++e23df2e0a78a         ldimm    $r15, 2326257906
++e24112dee78a         ldimm    $r16, 2330451474
++fadea58406a60702     ffma     $r23h, $r18h.abs, r84l, sat
++e24512dee78a         ldimm    $r17, 2330451474
++e249f2e0a78a         ldimm    $r18, 2326257906
++e24d12dee78a         ldimm    $r19, 2330451474
++e25112dee78a         ldimm    $r20, 2330451474
++1404                 ret      r2
++1400                 ret      r0
++1464                 ret      r50
++00c008006702         jmp_any  40304648
++0800                 trap
++0410                 call     r8
++04c0                 call     r96
++fe0c0e0c0000         mov_a    $r3l, 14
++9a702d80             fmul     $r28l, 0.90625, 0.125
++be040e0c0000         ffs      $r1l, 14
++be02120c0000         ffs      $r0h, 18
++8a5e2d80             rcp      $r23h, 0.90625
++1414                 ret      r10
++fe100e0c0000         mov_a    $r4l, 14
++fe0c120c0000         mov_a    $r3l, 18
++fe7a0e080000         andn2    $r30h, 14, 0
++16180000             hmul     r6l, 0.0, 0.0
++5a0a2d80             fmul     r2h, 0.90625, 0.125, sat
++627925992281         ldimm    r30, 2166528293
++161d0000             hmul     _, 0.0, 0.0
++fe761e080000         andn2    $r29h, 30, 0
++fe760e080000         andn2    $r29h, 14, 0
++8a70ed80             rcp      $r28l, ^r22h
++fe7412080000         andn2    $r29l, 18, 0
++be620e080000         popcnt   $r24h, 14
++4a624d80             rcp      r24h, r6h, sat
++4a5d2380             rcp      r23, 0.59375, sat
++4a5d2280             rcp      r23, 0.5625, sat
++1e0705200f062401     imadd    dr1, 5, ^r57l, 6.sx, lsl 4
++1e0cff0fa7005410     imsub    r35l, r24, 64.sx, lsl 3
++1e0cff0f27005410     imsub    r35l, r24, 64.sx, lsl 2
++2e00010800000000     shlhi    r0l, 1, 0, 0, 0
++0a045505             floor    r1l, u138h.abs
++2e85020000000000     bfeil    r1, 2, 0, 0, 0
++2e91020000000000     bfeil    r4, 2, 0, 0, 0
++0a00f010             rsqrts   r0l, ^r24l
++2888                 doorbell 136
++2800                 doorbell 0
++2804                 doorbell 4
++6800                 barrier
++288c                 doorbell 140
++2ebd020400000000     asr      r15, 2, 0, 0, 0
++2860                 doorbell 96
++2e3d020400000000     extr     r15, 2, 0, 0, 0
++28a8                 doorbell 168
++0440                 call     r32
++16099482             hmul     _, $r10l.abs, 0.125
++2810                 doorbell 16
++1406                 ret      r3
++1426                 ret      r19
++14f8                 ret      r124
++2824                 doorbell 36
++050010040044         load     , dr0, lsl 1, i8, none, a
++050010050044         load     , dr0, 1, lsl 1, i8, none, a
++050010060044         load     , dr0, lsl 1, i8, none, a
++050010070044         load     , dr0, 1, lsl 1, i8, none, a
++0500100c0044         load     , du0, lsl 1, i8, none, a
++0500100d0044         load     , du0, 1, lsl 1, i8, none, a
++0500100e0044         load     , du0, lsl 1, i8, none, a
++8500300f0044         load     , du0, 3, lsl 1, i16, none, a
++11042a85             st_var   r33, r53l
++268016022029         hadd     r64l, r75l.abs, r32l.abs
++268006022029         hadd     r64l, r67l.abs, r32l.abs
++3e1502090000         popcnt   r5, u1l
++264d0200             hadd     _, 0.03125, 0.0
++8a152b80             rcp      $r5, 0.84375
++21001900             iter     r0l_r0h_r1l_r1h, cf25
++00c00c001707         jmp_any  118947852
++268016032029         hadd     r64l, u75l.abs, r32l.abs
++268006032029         hadd     r64l, u67l.abs, r32l.abs
++3e1102090000         popcnt   r4, u1l
++0a152b80             rcp      r5, 0.84375
++26000000             hadd     r0l, 0.0, 0.0
++0a012b80             rcp      r0, 0.84375
++0482                 call     r65
++11042a8b             st_var   r97, r85l
++564e0302             hmul     r19h, r1h.abs, 0.0, sat
++56100601             hmul     r4l, u3l, 0.0, sat
++20005900             jmp_if_skipping_doorbell 89
++560a0800             hmul     r2h, 0.125, 0.0, sat
++04a4                 call     r82
++560a0500             hmul     r2h, 0.078125, 0.0, sat
++56020500             hmul     r0h, 0.078125, 0.0, sat
++11003080             st_var   r0, r24l
++3680020067004416     hfma     r32l, 2.25, r88l.abs.neg, r32l.neg
++364002000a03         hfma     r16l, 0.03125, $r16l, 0.046875
++2e00d01041000280     bfi      r0l, ^r8l, 17, r0, 17
++09600f0624010000     st_tile  r24l, 15, 0, 192, u16norm, y
++190000005780         latomic  _, r0, r0l, 48, add
++20000000             jmp_if_skipping_doorbell 0
++424002006700         if       0.03125, r24.abs, 0, fgt
++21214040             iter     r8, cf0, fwd
++21400200             iter     r16l_r16h_r17l_r17h, cf2
++09006702548a0000     st_tile  r0l_r0h, 39, r17l, 320, i32, xz
++26000410             hadd     r0l, 0.0625, 0.015625
++260b0755             hadd     _, u3h.neg, 0.078125
++00c008009f00         jmp_any  10420232
++00c099257433         jmp_any  863249817
++0434                 call     r26
++42236f0b260a         else     r80, 0, fnlt
++7e250015122d         nor      r73, u96l, u48h
++7e2521b00215         zero     r41, 97, 107
++ef1100020080         shuffle  $r4, r0, 0, quad, rotate
++c20000000000         update_exec cache
++7e35804ea933         orn2     r109, $r0, $r106
++00c008000f06         jmp_any  101646344
++2e81160a00000000     shrhi    r0, r11, 0, 0, 0
++41003b44             zs_emit  r0l, r61h
++424baf0b260a         else     r80, 1, fngt
++4205ae0b0102         while    -0.25, 0, fneq
++2e00000000000f06     bfi      r0l, 64, 128, 12
++00c008002bc4         jmp_any  -1003814904
++420000000000         update_exec
++21005100             iter     r0l_r0h_r1l_r1h, cf17, fwd
++61000f05             iter     r0l_r0h_r1l_r1h, cf15, cf5
++0900670254320000     st_tile  r0l_r0h, 39, r6l, 320, i32, xz
++1e40020067005434     imadd    r112l, 66, r24.sx, 64.sx, lsl 2
++21614040             iter     r24, cf0, fwd
++00c00b00a000         jmp_any  10485771
++c2192a810002         if       u21l, -0.125, 3, cache, fneq
++41000f06             zs_emit  r64l
++42296a810002         if       u149l, -0.125, 1, fnlt
++c24d2ea70300         while    1.625, 1, cache, fngt
++20c052ad66cd         jmp_none -848908974
++c2193e570300         if       1.3125, 3, cache, fneq
++212c0300             iter     r11l_r11h_r12l_r12h, cf3
++21300300             iter     r12l_r12h_r13l_r13h, cf3
++29247c1c1000         lstore   r9l, u30l, r0h, rg11b10f, x
++20005100             jmp_if_skipping_doorbell 81
++69a1752d8000f91f     lload    r40, u122h, rgb9e5, w
++d21b2a810002         else     u21l, 136, 3, cache, ine
++4a4522c3             log2     r17, sat
++420010000000         if       0.25, 0.0, 0, feq
++2200d9133c1b00c0     ballot   r32l, quad, sgt
++69a135038000e915     lload    r40, r58h, f16, w
++3801                 wait     b
++364002006700         hfma     r16l, 0.03125, r24l.abs.neg, 0.0
++41400200             zs_emit  r16l
++20001100             jmp_if_skipping_doorbell 17
++220029333c3b00c0     ballot   r96l, quad, sgt
++4a213219             rsqrts   r8, u25l.neg, sat
++410c2000             zs_emit  r3l
++20001300             jmp_if_skipping_doorbell 19
++09000f0604010000     st_tile  , 15, 0, 192, u16norm, none
++0a293513             rsqrts   r10
++0a0d0d15             rsqrts   r3, u6h.abs
++00c09f01541b         jmp_any  458490271
++362e12004704         hfma     r11h, 0.28125, r24l.neg, 0.0625
++362212004704         hfma     r8h, 0.28125, r24l.neg, 0.0625
++422212009f01         else     0.28125, u184.neg, 0, flt
++1e2e120047045403     imadd    r11h, 18, r120l.sx, 68.sx, lsl 2
++11041a87             st_var   r97, r45l
++1e201a004704540a     imadd    r8l, 154, r88l.sx, 68.sx, lsl 2
++1e2e120047045405     imadd    r11h, 82, r56l.sx, 68.sx, lsl 2
++11042a87             st_var   r97, r53l
++1e2e12009f015403     imadd    r11h, 18, u248, 65.sx, lsl 3
++521126010400         if       u19l, r0l, 2, ine
++3e0502000000         intl     r1, 2, 0
++4a04f010             rsqrts   r1l, ^r24l, sat
++ca04f010             rsqrts   $r1l, ^r24l, sat
++0a00f012             rsqrts   r0l, ^r24
++6f8110020000         quad     r0, r8, and
++1e2e12009f015411     imadd    r43h, 18, u184, 65.sx, lsl 3
++1104328e             st_var   r65, r121l
++4204f0100500         while    ^r24l, r8h, 0, feq
++4204e0200a00         while    ^r16l, $r17l, 0, feq
++4200d0200a00         if       ^r8l, $r17l, 0, feq
++360505016281         hfma     _, u2h, r16l.abs.neg, $r0h
++362f0520322a         hfma     _, 0.078125, u17l.abs, 0.8125
++52030e110102         else     u7l, 145, 0, ine
++d2050e110102         while    u7l, 145, 0, cache, ine
++4a0d2b1f             rsqrts   r3, sat
++6f1500220000         shuffle  r5, r0, 2, quad
++6f1126100702         shuffle  r4, 38, r88h, quad
++6f1126120702         shuffle  r4, r19, r88h, quad
++6f1100020000         shuffle  r4, r0, 0, quad
++762f010052bf         hfma     _, 0.015625, u16l.neg, $r31h, sat
++09000f0624010000     st_tile  r0l, 15, 0, 192, u16norm, y
++520b1e310100         else     u15l, 19, 1, ine
++d21b1e230100         else     18, 3, cache, ine
++220059333c3b00c0     ballot   r96l, quad, sgt
++48400200             pixwait  576, 0
++41100f05             zs_emit  r36l
++2e81120200800000     bfeil    r0, r9, 0, $r0l, 0
++7e2e12009f01         and      r11h, 18, u184
++1e02208047045402     imadd    r0h, 32, r92l.sx, 68.sx, lsl 2
++7e2212002204         zero     r8h, 82, r16
++722e1200             mov      r11h, unk18
++72221200             mov      r8h, unk18
+-- 
+2.54.0 (Apple Git-157)
+
