@@ -40,7 +40,8 @@ asahi-g16-toolkit/
 │   ├── extract_g16_metallib.py   # Extracts raw AGX shader code from Universal Fat / Thin Mach-O metallibs
 │   ├── scan_g16_opcodes.py       # Sliding-window disassembler scanner & opcode clustering engine
 │   ├── verify_round_trip.py      # Dual bidirectional round-trip verification engine (100% bit-exact pack)
-│   └── check_m1n1_env.py         # m1n1 remote control USB topology & dependency checker
+│   ├── check_m1n1_env.py         # m1n1 remote control USB topology & dependency checker
+│   └── test_m3pro_baremetal.py   # Live bare-metal hardware MMIO, P-States, UAT & G16 shader test runner
 ├── proposals/
 │   └── AGX2_G16_draft.xml        # Structural XML proposal for G16 instructions in Mesa AGX2.xml
 ├── test/
@@ -60,8 +61,10 @@ asahi-g16-toolkit/
 │   ├── 0012-asahi-Add-Apple-G16-chip-detection-and-compiler-pack.patch
 │   └── 0013-asahi-Add-G16-hardware-barrier-lowering-accurate-dev.patch
 └── docs/
-    ├── G16_REVERSE_ENGINEERING_REPORT.md  # Detailed reverse engineering analysis report
-    └── M1N1_REMOTE_CONTROL_GUIDE.md      # Dual-machine m1n1 remote control & hardware GPU debugging guide
+    ├── G16_REVERSE_ENGINEERING_REPORT.md        # Detailed reverse engineering analysis report
+    ├── M1N1_REMOTE_CONTROL_GUIDE.md            # Dual-machine m1n1 remote control & hardware GPU debugging guide
+    ├── G16_PHYSICAL_HARDWARE_DISCOVERY_REPORT.md # First physical MMIO, PMGR, and framebuffer discoveries
+    └── M3_PRO_BAREMETAL_TEST_REPORT.md         # Live bare-metal hardware validation and G16 shader payload report
 ```
 
 ---
