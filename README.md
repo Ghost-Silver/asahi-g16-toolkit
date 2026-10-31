@@ -38,14 +38,24 @@ Developed as part of the initiative to bring full Linux support (including Arch 
 asahi-g16-toolkit/
 ├── tools/
 │   ├── extract_g16_metallib.py   # Extracts raw AGX shader code from Universal Fat / Thin Mach-O metallibs
-│   └── scan_g16_opcodes.py       # Sliding-window disassembler scanner & opcode clustering engine
+│   ├── scan_g16_opcodes.py       # Sliding-window disassembler scanner & opcode clustering engine
+│   └── verify_round_trip.py      # Dual bidirectional round-trip verification engine (100% bit-exact pack)
 ├── proposals/
 │   └── AGX2_G16_draft.xml        # Structural XML proposal for G16 instructions in Mesa AGX2.xml
 ├── test/
 │   └── g16_cases.txt             # 250 verified real-world G16 test cases for Mesa test-disasm.py
 ├── patches/
 │   ├── 0001-asahi-isa-Initial-Apple-G16-bring-up-support.patch
-│   └── 0002-asahi-isa-Add-G16-indirect-jump-modifiers-RIA2-raytr.patch
+│   ├── 0002-asahi-isa-Add-G16-indirect-jump-modifiers-RIA2-raytr.patch
+│   ├── 0003-asahi-isa-Add-G16-Subgroup-Matrix-Vector-operations-.patch
+│   ├── 0004-asahi-isa-Add-G16-Subgroup-SIMD-ops-and-i64-ALU-extension.patch
+│   ├── 0005-asahi-isa-Add-G16-8-byte-SIMD-matrix-vector-family-and-ALU-modifiers.patch
+│   ├── 0006-asahi-isa-Add-full-RIA2-raytracing-domain-and-G16-tile-local-memory-modifiers.patch
+│   ├── 0007-asahi-isa-Add-G16-Global-Memory-Control-Flow-Sync-and-extended-SIMD.patch
+│   ├── 0008-asahi-isa-Add-G16-System-Control-Flow-predictor-family-and-8B-extensions.patch
+│   ├── 0009-asahi-isa-Add-unaligned-register-support-and-G16-indirect-calls.patch
+│   ├── 0010-asahi-isa-Elevate-G16-ISA-recognition-rate-to-89.46.patch
+│   └── 0011-asahi-isa-Achieve-100.00-G16-ISA-recognition-rate.patch
 └── docs/
     └── G16_REVERSE_ENGINEERING_REPORT.md  # Detailed reverse engineering analysis report
 ```
@@ -85,6 +95,15 @@ Output:
 ```text
 Pass.
 ```
+
+### 5. Run Dual Round-Trip Verification (Bit-Exact Pack & Idempotency)
+```bash
+python3 tools/verify_round_trip.py
+```
+Validates bidirectional mathematical reversibility across the Mesa baseline (`cases.txt`), G16 suite (`g16_cases.txt`), and real-world compiled driver shader streams:
+* **Forward**: `Binary (Hex) -> Decode Fields -> Disassemble to ASM String`
+* **Reverse**: `ASM / Fields -> Deposit Bitfields -> Reconstruct Machine Code`
+* **Invariance Check**: `Encoded(Decoded(x)) == x` (100% Bit-Exact Equivalence)
 
 ---
 
