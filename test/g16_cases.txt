@@ -30,34 +30,46 @@
 9f01543a0306         simd_reduce 100874836
 0f0554116700         simd_broadcast 6754644
 5406                 jmp      r3
+2000110100404600     sync_barrier 301721452817
+2000010100404400     sync_barrier 293131518209
 9f01543c0308         simd_reduce 134429780
 aa3d2205             fadd     $r15, u17l.abs, 0.0
 0f0554156700         simd_broadcast 6755668
 540a                 jmp      r5
 021e200011010040     csel     r7h, 0.5, u8l, r0h, r0l, fgt
 2a50c700             fadd     r20l, ^r3h, 0.0
+2080330040000f05     sync_fence 5561986842675
+5415                 jmp      r10, link
+67004426031e2000     simd_lane_permute 137942476356
 0f0604010000         simd_shuffle 260
 9f016440030a         simd_reduce 167985252
 0a412205             floor    r16, u17l.abs
 2a40e700             fadd     r16l, ^r19h, 0.0
+20800f0554016700     sync_fence 442403915023
 540c                 jmp      r6
 0220200011010040     csel     r8l, 0.5, u8l, r0h, r0l, fgt
 1a642380             fmul     r25l, 0.59375, 0.125
 060004020000         i64_alu_ext 516
 0320200001010040     ria_abort 70368761020448
 9f015442030c         simd_reduce 201540180
-540e                 jmp      r7
 3a52c7002281         ffma     r20h, ^r3h, r16, $r0h
+2080430040000f05     sync_fence 5561986842691
+6700442803212000     simd_lane_permute 137992808516
 9f01643e030e         simd_reduce 235093604
 3a42e7002281         ffma     r16h, ^r19h, r16, $r0h
+20800f0554056700     sync_fence 442471023887
 3a6623800600         ffma     r25h, 0.59375, r20l, 0.0
 0402                 call     r1
 4a5ac700             floor    r22h, ^r3h, sat
-9f0154440310         simd_reduce 268649556
+2080000060009f01     sync_fence 1782417719296
 2a452205             fadd     r17, u17l.abs, 0.0
 0222200011010040     csel     r8h, 0.5, u8l, r0h, r0l, fgt
 ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
+2080530040000f05     sync_fence 5561986842707
+6700442a03222000     simd_lane_permute 138009586244
+9f0164460312         simd_reduce 302204516
 4a44e700             floor    r17l, ^r19h, sat
+20800f0554096700     sync_fence 442538132751
 5a682380             fmul     r26l, 0.59375, 0.125, sat
 4a492205             floor    r18, u17l.abs, sat
 5a44e700             fmul     r17l, ^r19h, 0.0, sat
@@ -68,13 +80,13 @@ ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
 06000c020000         i64_alu_ext 524
 6a44e700             fadd     r17l, ^r19h, 0.0, sat
 6a58c700             fadd     r22l, ^r3h, 0.0, sat
-7a4ac7002281         ffma     r18h, ^r3h, r16, $r0h, sat
-5a6c2380             fmul     r27l, 0.59375, 0.125, sat
+2080000060007a4a     sync_fence 81887852756992
 aa512205             fadd     $r20, u17l.abs, 0.0
 7a50c7002281         ffma     r20l, ^r3h, r16, $r0h, sat
+6700443003282000     simd_lane_permute 138110251076
 8a42c700             floor    $r16h, ^r3h
 42000e000000         if       0.21875, 0.0, 0, feq
-41010040             zs_emit  0, r0l
+2000410100404400     sync_barrier 293131518273
 0f0154c00400         simd_ballot 311380
 0702826002dce782     simd_vec_rd 143932340199554
 1702825ef2dca784     simd_vec_wr 145856501276290
@@ -98,6 +110,7 @@ aa512205             fadd     $r20, u17l.abs, 0.0
 1702022212dc2780     simd_vec_wr 140908684255746
 69000f060401         lload    , r7h, 0, ext0, u16norm, none
 0f0404190f01         simd_quad_op 17766660
+05000f0554050f01     gmem_fence 1164025529615
 1402                 ret      r1
 0400                 call     r0
 e681120a0000         hadd     _, r9l.abs, 0.0, sat, ext_s1
@@ -123,8 +136,10 @@ a689020a0000         hadd     _, r1l.abs, 0.0, ext_s1
 2780069407028200     simd_lane_mat1 558379799558
 0f0154ea0100         simd_ballot 125524
 0100000000002aa1     tg_mem_ext 177201760698368
+0f00547ab2ffffff     simd_ballot_8b 281474971630164
 0f0604020000         simd_shuffle 516
 1404                 ret      r2
+0f005448b2ffffff     simd_ballot_8b 281474971617364
 0300040000000000     ria_bbox_test 4
 1400                 ret      r0
 01000f0554050f01     tg_mem_ext 1164025529615
@@ -138,6 +153,8 @@ a689020a0000         hadd     _, r1l.abs, 0.0, ext_s1
 fe0c0e0c0000         mov_a    $r3l, 14
 0713c20b9a702d80     simd_vec_rd_wide 140932651027394
 c20302140780         else     0.03125.abs, r24h, 0, cache, fneq, ext1
+05002080eae3a587     gmem_fence 149146563149856
+06002081e2d7         i64_alu_ext 3621945632
 be040e0c0000         ffs      $r1l, 14
 be02120c0000         ffs      $r0h, 18
 8a5e2d80             rcp      $r23h, 0.90625
@@ -146,23 +163,23 @@ fe100e0c0000         mov_a    $r4l, 14
 c20c520e0780         while    r9.abs.neg, r24l, 1, cache, feq, ext1
 0703827a62120780     simd_vec_rd_ext 140767861570178
 0703827c6ad925c3     simd_vec_rd_ext 214567328840834
+060020818ad7         i64_alu_ext 3616178464
 fe0c120c0000         mov_a    $r3l, 18
 7a7c2d80867d         ffma     r31l, 0.90625, r20l.neg, r30h, sat
 0703c2006702547e     simd_vec_rd_ext 138899282657474
-fe7a0e080000         andn2    $r30h, 14, 0
-16180000             hmul     r6l, 0.0, 0.0
 0800                 trap
+5a0a2d80             fmul     r2h, 0.90625, 0.125, sat
 627925992281         ldimm    r30, 2166528293
 0713c21662d72545     simd_vec_rd_wide 76028829636290
-161d0000             hmul     _, 0.0, 0.0
 62702d80             ldimm    r28l, 32813
 07038274b28a0780     simd_vec_rd_ext 140769880077442
 07038278aad9e5cf     simd_vec_rd_ext 228586106288258
+0500208092e1e59f     gmem_fence 175809680801824
 fe761e080000         andn2    $r29h, 30, 0
 fe760e080000         andn2    $r29h, 14, 0
-8a70ed80             rcp      $r28l, ^r22h
+050020808ad7e553     gmem_fence 92246628794400
 0f028276a257         simd_vote 1470264962
-fe7412080000         andn2    $r29l, 18, 0
+05002080a374fe74     gmem_fence 128636227387424
 0f028276d274         simd_vote 1959949954
 0f02825ef272         simd_vote 1928486530
 0f0282621214         simd_vote 336749186
@@ -176,75 +193,58 @@ c2006a0a4d80         if       r21.neg, ^r8l.abs, 0, cache, feq, ext1
 0f02827d0704         simd_vote 67599746
 09000f0404190f01     st_tile  , 15, 70, 192, u8norm, none, ext0, ext1, ext2, ext3
 0300b82e120012d9     ria_bbox_test 238671333830328
-be620e080000         popcnt   $r24h, 14
+05002080ead7a533     gmem_fence 56787385090080
 0f028261c704         simd_vote 80175490
 0f02825e02d9         simd_vote 3640811138
 0304b82e1200e35c     ria_leaf_test 102130028523192
 be600e080000         popcnt   $r24l, 14
+0500208002dfe583     gmem_fence 145023312232480
+05002080f2e1a585     gmem_fence 146947506864160
 030cb82e1200e35c     ria_subdiv_test 102130028523192
 0314b82e1200e35c     ria_curve_test 102130028523192
 be5e0e080000         popcnt   $r23h, 14
 0318b82e1200e35c     ria_procedural_test 102130028523192
 031cb82e1200e35c     ria_commit 102130028523192
-3a624d808627         ffma     r24h, r6h, r20l.neg, 0.71875
 0320b82e1200e35c     ria_abort 102130028523192
 0324b82e1200e35c     ria_restart 102130028523192
-4a624d80             rcp      r24h, r6h, sat
-62624d80             ldimm    r24h, 32845
 0340b82e1200e35c     ria_inst_query 102130028523192
 a9008f045406         lstore   r0l_r0h, 0, cache, ext1, lsl 1, u8norm, xz
+0f005470f3ffffff     simd_ballot_8b 281474975887444
 0f05541a4a5d         simd_broadcast 1565137492
 0700070200000000     simd_vec_op0 519
 d2dca7800682         while    $r19h, r84l, 3, cache, sgt, ext1
 4a5d2280             rcp      r23, 0.5625, sat
 d262a7800682         else     $r19h, r84l, 0, cache, unk3, ext1
-060017020000         i64_alu_ext 535
-031c210041020010     ria_commit 17592223858721
-0320210041020010     ria_abort 17592223858721
-0324210041020010     ria_restart 17592223858721
+0f005422b7ffffff     simd_ballot_8b 281474971935316
+3a642b800600         ffma     r25l, 0.84375, r20l, 0.0
+e700542203192100     simd_matrix_mul 142153556564
+3a662b800600         ffma     r25h, 0.84375, r20l, 0.0
+2000510200901100     sync_barrier 75430363729
+e7005423031b2100     simd_matrix_mul 142187111252
+e7005424031c2100     simd_matrix_mul 142203888724
+e7005425031d2100     simd_matrix_mul 142220666196
+e7005426031e2100     simd_matrix_mul 142237443668
+e700542703202100     simd_matrix_mul 142270998356
+e700542803212100     simd_matrix_mul 142287775828
+e7005429031f2100     simd_matrix_mul 142254221652
 2707022800000000     simd_lane_mat2 10242
 0a0d2b80             rcp      r3, 0.84375
 1e0705200f062401     imadd    dr1, 5, ^r57l, 6.sx, lsl 4
-0340308c11047cff     ria_inst_query 280908109286448
+1f0154040340308c     simd_quad_shuffle 154138860258388
 1e0cff0fa7005410     imsub    r35l, r24, 64.sx, lsl 3
 031c1200f0120500     ria_commit 21792555026
 1e0cff0f27005410     imsub    r35l, r24, 64.sx, lsl 2
 031c3284f0140d00     ria_commit 56185881650
-0318822811012700     ria_procedural_test 167521626242
-031c3200f0120500     ria_commit 21792555058
-2700540e031c1804     simd_lane_mat0 4501595688532
-2f8082100702800e     simd_quad_swz1 15942952620162
+1f01540603188228     simd_quad_shuffle 44539213710932
+27005402031c3200     simd_lane_mat0 215218324052
 0300002913013b07     ria_bbox_test 7950002497792
 2e00010800000000     shlhi    r0l, 1, 0, 0, 0
-03204e0427055402     ria_abort 2559886951502
 17059f015400030a     simd_vec_sync 11008006685087
 0a045505             floor    r1l, u138h.abs
-03000800e0260a00     ria_bbox_test 43601887240
+9f00540003000800     simd_reduce_8b 34359935060
 2e85020000000000     bfeil    r1, 2, 0, 0, 0
-0320062811012705     ria_abort 5665079764998
+1f01540003200628     simd_quad_shuffle 44006771982420
 030c5c040b012e91     ria_subdiv_test 159626772022364
 03005c044b8a0104     ria_bbox_test 4404661650524
 2f8026a007028000     simd_quad_swz1 549789868070
 03040a00f0100100     ria_leaf_test 4579131402
-2f80840e07029f01     simd_quad_swz1 1782445444740
-2888                 doorbell 136
-03040800f0111100     ria_leaf_test 73315385352
-2800                 doorbell 0
-090412053e800402     st_tile  r1l_r1h, 18, 160, 96, explicit_coords, s8norm, xy, ext2
-030020018b020904     ria_bbox_test 4436743880992
-060087020000         i64_alu_ext 647
-6700821000000000     simd_lane_permute 4226
-8410                 call     r8, mode
-2804                 doorbell 4
-8400                 call     r0, mode
-09000f0554010f01     st_tile  r0l_r0h, 15, 64, 192, s8norm, xz, ext0, ext1, ext2, ext3
-0318288816058a0b     ria_procedural_test 12687418755112
-6800                 barrier
-288c                 doorbell 140
-03145c046b0d2ebd     ria_curve_test 208005491262556
-03185c0452af2707     ria_procedural_test 7867026506844
-031c2860f0170d00     ria_commit 56236204072
-03145c046b0d2e3d     ria_curve_test 67268002907228
-03185c04522f2707     ria_procedural_test 7864879023196
-2f3d002400000000     simd_quad_swz2 9216
-28a8                 doorbell 168
