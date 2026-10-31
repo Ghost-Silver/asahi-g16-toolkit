@@ -42,7 +42,8 @@ asahi-g16-toolkit/
 │   ├── verify_round_trip.py      # Dual bidirectional round-trip verification engine (100% bit-exact pack)
 │   ├── check_m1n1_env.py         # m1n1 remote control USB topology & dependency checker
 │   ├── test_m3pro_baremetal.py   # Live bare-metal hardware MMIO, P-States, UAT & G16 shader test runner
-│   └── draw_cyber_hud.py         # 3024x1964 Liquid Retina XDR cybernetic telemetry test screen renderer
+│   ├── draw_cyber_hud.py         # 3024x1964 Liquid Retina XDR cybernetic telemetry test screen renderer
+│   └── probe_m3pro_hardware.py   # Live probe of CPU, DRAM, SMC battery/fans, Wi-Fi/BT, ANE, audio
 ├── proposals/
 │   └── AGX2_G16_draft.xml        # Structural XML proposal for G16 instructions in Mesa AGX2.xml
 ├── test/
@@ -65,7 +66,8 @@ asahi-g16-toolkit/
     ├── G16_REVERSE_ENGINEERING_REPORT.md        # Detailed reverse engineering analysis report
     ├── M1N1_REMOTE_CONTROL_GUIDE.md            # Dual-machine m1n1 remote control & hardware GPU debugging guide
     ├── G16_PHYSICAL_HARDWARE_DISCOVERY_REPORT.md # First physical MMIO, PMGR, and framebuffer discoveries
-    └── M3_PRO_BAREMETAL_TEST_REPORT.md         # Live bare-metal hardware validation and G16 shader payload report
+    ├── M3_PRO_BAREMETAL_TEST_REPORT.md         # Live bare-metal hardware validation and G16 shader payload report
+    └── M3_PRO_SYSTEM_HARDWARE_DISCOVERY.md     # Full 8-subsystem CPU, DRAM, SMC, Wi-Fi, audio hardware audit
 ```
 
 ---
