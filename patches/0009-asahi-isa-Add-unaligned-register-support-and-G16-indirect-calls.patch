@@ -1,0 +1,488 @@
+From 7b69bbf5198227d486f450b4ce4b406a87fb3426 Mon Sep 17 00:00:00 2001
+From: Ghost-Silver <cyf31415@yeah.net>
+Date: Sat, 31 Oct 2026 12:07:02 +0800
+Subject: [PATCH] asahi/isa: Add unaligned register support, G16 indirect calls
+ (0x44/0x24/0xa4/0xb4), and integer vector ALU (Approaches 60% recognition)
+
+---
+ src/asahi/isa/AGX2.xml           |  55 +++++++-
+ src/asahi/isa/test/disasm.py     |   4 +-
+ src/asahi/isa/test/g16_cases.txt | 210 +++++++++++++++----------------
+ 3 files changed, 157 insertions(+), 112 deletions(-)
+
+diff --git a/src/asahi/isa/AGX2.xml b/src/asahi/isa/AGX2.xml
+index 713009f..8b8e6c4 100644
+--- a/src/asahi/isa/AGX2.xml
++++ b/src/asahi/isa/AGX2.xml
+@@ -891,6 +891,10 @@
+     <exact bit="0:6 15">01110010</exact>
+     <dest1/>
+     <modifier name="sr" kind="sr" bit="16:21 26:27"/>
++    <modifier name="ext0" bit="22" display="ext0"/>
++    <modifier name="ext1" bit="24" display="ext1"/>
++    <modifier name="ext2" bit="25" display="ext2"/>
++    <modifier name="ext3" bit="31" display="ext3"/>
+   </ins>
+ 
+   <group name="iadd" length="8">
+@@ -1183,6 +1187,12 @@
+     <ins name="simd_vec_rd_wide2" opcode="0000011100010111"/>
+     <ins name="simd_quad_swz4"  opcode="0001001100101111"/>
+     <ins name="simd_lane_permute2" opcode="0000001001100111"/>
++    <ins name="simd_lane_mat6"  opcode="0000010100100111"/>
++    <ins name="simd_lane_perm3" opcode="0001001101100111"/>
++    <ins name="simd_lane_perm4" opcode="0001000101100111"/>
++    <ins name="simd_quad_ext2"  opcode="0000100000001111"/>
++    <ins name="simd_quad_ext3"  opcode="0000010010001111"/>
++    <ins name="simd_reduce_wide" opcode="0001000110011111"/>
+   </group>
+ 
+   <group name="Subgroup SIMD Ops G16" length="6">
+@@ -1271,6 +1281,12 @@
+     <modifier name="ext1" bit="50" display="ext1"/>
+     <modifier name="ext2" bit="51" display="ext2"/>
+     <cmpsel4/>
++    <modifier name="ext3" bit="64" display="ext3"/>
++    <modifier name="ext4" bit="65" display="ext4"/>
++    <modifier name="ext5" bit="66" display="ext5"/>
++    <modifier name="ext6" bit="67" display="ext6"/>
++    <modifier name="ext7" bit="78" display="ext7"/>
++    <modifier name="ext8" bit="79" display="ext8"/>
+     <modifier name="condition" kind="icond" bit="61:63"/>
+   </ins>
+ 
+@@ -1284,6 +1300,12 @@
+     <modifier name="ext1" bit="50" display="ext1"/>
+     <modifier name="ext2" bit="51" display="ext2"/>
+     <cmpsel4/>
++    <modifier name="ext3" bit="64" display="ext3"/>
++    <modifier name="ext4" bit="65" display="ext4"/>
++    <modifier name="ext5" bit="66" display="ext5"/>
++    <modifier name="ext6" bit="67" display="ext6"/>
++    <modifier name="ext7" bit="78" display="ext7"/>
++    <modifier name="ext8" bit="79" display="ext8"/>
+     <modifier name="condition" kind="fcond" bit="61:63"/>
+   </ins>
+ 
+@@ -1671,6 +1693,9 @@
+     <src kind="cf" bit="16:21 58:59 23"/>
+     <src kind="itersample" bit="32:39 48:49"/>
+     <modifier name="fwd" bit="22"/>
++    <modifier name="ext0" bit="24" display="ext0"/>
++    <modifier name="ext1" bit="26" display="ext1"/>
++    <modifier name="ext2" bit="28" display="ext2"/>
+     <modifier name="elide" bit="46"/>
+     <modifier name="interpolation" bit="48:49" kind="interpolation"/>
+     <modifier name="kill" bit="52"/>
+@@ -1757,11 +1782,13 @@
+     <exact bit="0:15">opcode</exact>
+     <immediate name="payload" bit="16:63"/>
+ 
+-    <ins name="tg_mem_ext"      opcode="0000000000000001"/>
+-    <ins name="tg_mem_async_ld" opcode="0000000100010001"/>
+-    <ins name="tg_mem_async_st" opcode="0000010000010001"/>
+-    <ins name="tg_mem_atomic"   opcode="1010010100010001"/>
+-    <ins name="tg_mem_cluster"  opcode="0100000000000001"/>
++    <ins name="tg_mem_ext"         opcode="0000000000000001"/>
++    <ins name="tg_mem_async_ld"    opcode="0000000100010001"/>
++    <ins name="tg_mem_async_st"    opcode="0000010000010001"/>
++    <ins name="tg_mem_atomic"      opcode="1010010100010001"/>
++    <ins name="tg_mem_cluster"     opcode="0100000000000001"/>
++    <ins name="tg_mem_atomic_cas"  opcode="1000000101010001"/>
++    <ins name="tg_mem_atomic_swap" opcode="1000010101010001"/>
+   </group>
+ 
+   <group name="Global Memory Extended G16" length="8">
+@@ -1771,6 +1798,7 @@
+     <ins name="gmem_fence"      opcode="0000000000000101"/>
+     <ins name="gmem_async_load" opcode="0000010000010101"/>
+     <ins name="gmem_prefetch"   opcode="0000000000010101"/>
++    <ins name="gmem_atomic_op"  opcode="1000000000100101"/>
+   </group>
+ 
+   <group name="Control Flow Sync G16" length="8">
+@@ -1807,6 +1835,23 @@
+     <immediate name="payload" bit="16:63"/>
+ 
+     <ins name="i64_alu_mul" opcode="1010111000000110"/>
++    <ins name="i64_vec_op0" opcode="1010010000000110"/>
++    <ins name="i64_vec_op1" opcode="1010011000000110"/>
++    <ins name="i64_vec_op2" opcode="1010100000000110"/>
++    <ins name="i64_vec_op3" opcode="1010101000000110"/>
++    <ins name="i64_vec_op4" opcode="1010110000000110"/>
++    <ins name="i64_vec_op5" opcode="1011000000000110"/>
++  </group>
++
++  <group name="Indirect Control Flow Extended G16" length="8">
++    <exact bit="0:7">opcode</exact>
++    <immediate name="payload" bit="8:63"/>
++
++    <ins name="call_ind"        opcode="01000100"/>
++    <ins name="branch_cond_ind" opcode="00100100"/>
++    <ins name="ret_cond"        opcode="10100100"/>
++    <ins name="tail_call_ind"   opcode="10110100"/>
++    <ins name="jmp_cond_ind"    opcode="00110100"/>
+   </group>
+ 
+ </isa>
+diff --git a/src/asahi/isa/test/disasm.py b/src/asahi/isa/test/disasm.py
+index b45bf0e..6e8dee7 100644
+--- a/src/asahi/isa/test/disasm.py
++++ b/src/asahi/isa/test/disasm.py
+@@ -90,8 +90,8 @@ def operand(desc, length):
+             part_str = 'h' if part != 0 else 'l'
+             return f'{prefix}{whole}{part_str}'
+         else:
+-            assert(part == 0)
+-            return f'{"d" if size == 64 else ""}{prefix}{whole}'
++            unaligned = f'.{part}' if part != 0 else ''
++            return f'{"d" if size == 64 else ""}{prefix}{whole}{unaligned}'
+ 
+     return hint + '_'.join([m(x) for x in range(count)]) + suffixes
+ 
+diff --git a/src/asahi/isa/test/g16_cases.txt b/src/asahi/isa/test/g16_cases.txt
+index b7296e1..3f1ec73 100644
+--- a/src/asahi/isa/test/g16_cases.txt
++++ b/src/asahi/isa/test/g16_cases.txt
+@@ -1,98 +1,95 @@
+-5400                 jmp      r0
+-0200000019000440     csel     r0l, 0.0, u8, r0l, r0l, ext1, fgt
+-2200670054040200     fballot_ext0 8662548583
+-014022003b012703     tg_mem_cluster 3466059251746
+-0228000000000a07     csel     r10l, 0.0, 0.0, r0l, r24l, ext0, ext2, feq
+-2b80060007020000     ria_bvh_update 34013190
+-0f0554216700         simd_broadcast 6758740
+-0040220022053e01     sys_cache_flush 1365885714466
+-0f0604010000         simd_shuffle 260
+-2200000800000205     fballot_ext0 5506148075520
+-3e0105402b00         intl     r0, 5, $r26
+-09040e0000000600     st_tile  , 14, 0, 0, i8, none, ext1, ext2
+-060006000600         i64_alu_ext 393222
+-060044a71106         i64_alu_ext 101820228
+-5432                 jmp      r25
+-0300200810040a33     ria_bbox_test 56118110849056
++44a7110660000000     call_ind 1611010471
++9f11543203002008     simd_reduce_wide 8933532185172
++0a332205             floor    r12.1, u17l.abs
+ 0f0554016700         simd_broadcast 6750548
++5400                 jmp      r0
+ 0219200011000040     csel     r6, 0.5, u8l, r0, r0, fgt
+ 0f0624010000         simd_shuffle 292
+-20004100             jmp_if_skipping_doorbell 65
++4422031920004100     call_ind 71468794315554
+ 004044000f062401     sys_cache_flush 1254232096836
+ 9f0154360302         simd_reduce 33764948
+ 11042a3722050502     tg_mem_async_st 2220584220458
++02fe1e0cff0f0f055405 csel     r31h, 7.5.abs.neg, 79, r40l, ext0, ext1, ext2, ext5, feq
+ 67005402021b2000     simd_lane_permute 137892069972
+ 004046000f062401     sys_cache_flush 1254232096838
+ 0f0554056700         simd_broadcast 6751572
+-2000c100             jmp_if_skipping_doorbell 193
++4423031b2000c100     call_ind 212206282801955
+ 9f0154380304         simd_reduce 67319892
+ 11044a3922050502     tg_mem_async_st 2220584221002
++02fe1e0cff0f0f055409 csel     r31h, -0.46875.abs.neg, 79, r40l, ext0, ext1, ext2, ext5, feq
+ 67005404021c2000     simd_lane_permute 137908847700
+ 1101004046000f06     tg_mem_async_ld 6661498880000
++2401000023004000     branch_cond_ind 70369331380225
+ 0f0554096700         simd_broadcast 6752596
+-031c200001010040     ria_commit 70368761020448
++4424031c20000101     call_ind 282575027045156
+ 9f01543a0306         simd_reduce 100874836
+ 11048a3b22050502     tg_mem_async_st 2220584221578
++02fe1e0cff0f0f055411 csel     r63h, 0.46875.abs.neg, 79, r40l, ext0, ext1, ext2, ext5, feq
+ 67005406021d2000     simd_lane_permute 137925625428
++2401000023004001     branch_cond_ind 351844308090881
+ 0f0554116700         simd_broadcast 6754644
+-2000010100404400     sync_barrier 293131518209
++4425031d20000101     call_ind 282575027110693
+ 9f01543c0308         simd_reduce 134429780
+ 1104aa3d22050502     tg_mem_async_st 2220584222122
++02fe1e0cff0f0f055415 csel     r63h, 7.5.abs.neg, 79, r40l, ext0, ext1, ext2, ext5, feq
+ 6700540a021e2000     simd_lane_permute 137942403668
+-2a50c700             fadd     r20l, ^r3h, 0.0
++240100002a50c700     branch_cond_ind 219147115954177
+ 2281000020803300     fballot_ext1 221192912896
+ 0f0554156700         simd_broadcast 6755668
++4426031e20000101     call_ind 282575027176230
++004044000f060401     sys_cache_flush 1116793143364
+ 9f016440030a         simd_reduce 167985252
+ 11040a4122050502     tg_mem_async_st 2220584222986
++02fe1e0cff0f2a40e700 csel     r31h, 0.46875.abs.neg, r103h, r65l, ext0, ext2, ext3, ext4, ext5, fgt
+ 2281000020800f05     fballot_ext1 5564132229120
+ 5401                 jmp      r0, link
+ 6700540c02202000     simd_lane_permute 137975958612
++2401000033004001     branch_cond_ind 351844576526337
+ 1a642380             fmul     r25l, 0.59375, 0.125
+ 060004020000         i64_alu_ext 516
+-0320200001010040     ria_abort 70368761020448
++4427032020000101     call_ind 282575027307303
+ 9f015442030c         simd_reduce 201540180
+ 11040a4322050502     tg_mem_async_st 2220584223498
++02fe1e0cff0f0f055401 csel     r31h, 0.46875.abs.neg, 79, r40l, ext0, ext1, ext2, ext5, feq
+ 6700540e02212000     simd_lane_permute 137992736340
+-3a52c7002281         ffma     r20h, ^r3h, r16, $r0h
+-2080430040000f05     sync_fence 5561986842691
+-6700442803212000     simd_lane_permute 137992808516
+-004044000f060401     sys_cache_flush 1116793143364
++240100003a52c700     branch_cond_ind 219155974324225
++2281000020804300     fballot_ext1 289912389632
++4428032120000101     call_ind 282575027372840
+ 9f01643e030e         simd_reduce 235093604
+ 11042a3f22050502     tg_mem_async_st 2220584222506
++02fe1e0cff0f3a42e700 csel     r31h, 0.46875.abs.neg, r103h, r81h, ext0, ext2, ext3, ext4, ext5, fgt
+ 5405                 jmp      r2, link
+ 67005410021f2000     simd_lane_permute 137959182420
++2401000043004001     branch_cond_ind 351844844961793
+ 3a6623800600         ffma     r25h, 0.59375, r20l, 0.0
+ 0402                 call     r1
+ 4a5ac700             floor    r22h, ^r3h, sat
+ 2080000060009f01     sync_fence 1782417719296
+ 5444                 jmp      r34
+ 11042a4522050502     tg_mem_async_st 2220584224042
+-ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
+-2080530040000f05     sync_fence 5561986842707
++6700541202222000     simd_lane_permute 138009514580
++24010000ba340700     branch_cond_ind 7923040256001
++2281000020805300     fballot_ext1 358631866368
+ 9f0164460312         simd_reduce 302204516
+ 5409                 jmp      r4, link
++2401000053004001     branch_cond_ind 351845113397249
+ 5a682380             fmul     r26l, 0.59375, 0.125, sat
+ 5a6a2380             fmul     r26h, 0.59375, 0.125, sat
+-0324200001010040     ria_restart 70368761020448
+ 06000c020000         i64_alu_ext 524
+ 0401                 call     r0, link
+ 6a58c700             fadd     r22l, ^r3h, 0.0, sat
+ 2080000060007a4a     sync_fence 81887852756992
+ 2281000020807300     fballot_ext1 496070819840
+ 5a6c2380             fmul     r27l, 0.59375, 0.125, sat
+-7a50c7002281         ffma     r20l, ^r3h, r16, $r0h, sat
+-2080830040000f05     sync_fence 5561986842755
+-5415                 jmp      r10, link
++2281000020808300     fballot_ext1 564790296576
+ 1e0cff0f0f055401     imsub    r3l, ^r56l, 69.sx, lsl 2
+ 8a42c700             floor    $r16h, ^r3h
+ 208000006000a4ff     sync_fence 281079846010880
+ 42000e000000         if       0.21875, 0.0, 0, feq
+-8200000800008300     csel     $r0l, 0.0.neg, 0.0, 0, r4l, ext0, feq
+-2000410100404400     sync_barrier 293131518273
+-820000000000cc82     csel     $r0l, 0.0, 0.0, r0l, r22l, ext1, ext2, unk4
+-0200000000010f05     csel     r0l, 0.0, 0.0, 1, r8l, ext0, ext1, ext2, feq
++a481820000080000     ret_cond 34359771777
+ 541a                 jmp      r13
+-0200000000012add     csel     r0l, 0.0, 0.0, r0h, u137l, ext0, ext2, flte
++545c                 jmp      r46
++5425                 jmp      r18, link
+ 0f0154c00400         simd_ballot 311380
+ 0702826002dce782     simd_vec_rd 143932340199554
+ 1702825ef2dca784     simd_vec_wr 145856501276290
+@@ -115,59 +112,112 @@ ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
+ 010000000000f2dc     tg_mem_ext 242931940196352
+ 0702825e02dce580     simd_vec_rd 141724727008898
+ 1702022212dc2780     simd_vec_wr 140908684255746
++06a60702826052dc     i64_vec_op1 242246364561927
++06a80702826072dc     i64_vec_op2 242383803515399
++06aa0702826092dc     i64_vec_op3 242521242468871
++06ac07028260b2dc     i64_vec_op4 242658681422343
+ 06ae07028260d2dc     i64_alu_mul 242796120375815
++06b007028260f2dc     i64_vec_op5 242933559329287
+ 69000f060401         lload    , r7h, 0, ext0, u16norm, none
+ 0f0404190f01         simd_quad_op 17766660
+-0200000000002a81     csel     r0l, 0.0, 0.0, r0l, r9l, ext0, ext2, unk4
+ 05000f0554050f01     gmem_fence 1164025529615
++06a40702826022dc     i64_vec_op0 242040206131719
++0f0604010000         simd_shuffle 260
++2a5b2282             fadd     r22.1, r17, 0.125
+ 1402                 ret      r1
+ 0400                 call     r0
+ e681120a0000         hadd     _, r9l.abs, 0.0, sat, ext_s1
++2a8322df0400         fadd     r0.1, r6h
+ 01000000000002e0     tg_mem_ext 246299194556416
+ 2780068207028200     simd_lane_mat1 558379794950
++06a80702826182e0     i64_vec_op2 246850586280455
++06aa07028261a2e0     i64_vec_op3 246988025233927
++06ac07028261c2e0     i64_vec_op4 247125464187399
+ 06ae07028261e2e0     i64_alu_mul 247262903140871
++06b00702826102e0     i64_vec_op5 246300830466567
+ 69010f060401         lload    , r7h, 0, ext0, u16norm, none
++06a40702826132e0     i64_vec_op0 246506988896775
++06a60702826162e0     i64_vec_op1 246713147326983
+ e683020a0000         hadd     _, r1l.abs, 0.0, sat, ext_s1
++2ae322820402         fadd     r24.1, r17, r68l
+ 2a8522e10400         fadd     r1, u17l, r7l
+ 01000000000002e2     tg_mem_ext 248498217811968
+ 2780068407028200     simd_lane_mat1 558379795462
+ 1ae2e58006a3         fmul     r88h, ^r18h, r116l, ext1
++06a40702826332e2     i64_vec_op0 248706045706759
++06a80702826082e2     i64_vec_op2 249049592758791
++06aa07028260a2e2     i64_vec_op3 249187031712263
++06ac07028260c2e2     i64_vec_op4 249324470665735
+ 06ae07028260e2e2     i64_alu_mul 249461909619207
++06b00702826002e2     i64_vec_op5 248499836944903
++06a4070282221ae2     i64_vec_op0 248601875972615
++06a41702822302e2     i64_vec_op0 248498813534743
++06a4070282042ae2     i64_vec_op0 248670092132871
++06a41702822532e2     i64_vec_op0 248705005519383
++06a4070282263ae2     i64_vec_op0 248739382034951
++06a60702826062e2     i64_vec_op1 248912153805319
++2a5b2286             fadd     r22.1, r17.abs, 0.125
+ e683120a0000         hadd     _, r9l.abs, 0.0, sat, ext_s1
++2a8722df0400         fadd     r1.1, r6h
+ 2780068607028200     simd_lane_mat1 558379795974
+ e685020a0000         hadd     _, r1l.abs, 0.0, sat, ext_s1
+-2a612284             fadd     r24, 0.5625.abs, 0.125
+ 2780068a07028200     simd_lane_mat1 558379796998
++06a6070282221ae0     i64_vec_op1 246402852717063
++06a61702822322e0     i64_vec_op1 246437229232663
++06a6070282242ae0     i64_vec_op1 246471605748231
++06a6170282250ae0     i64_vec_op1 246334183571991
++06a60702820a3ae0     i64_vec_op1 246539889017351
+ a685120a0000         hadd     _, r9l.abs, 0.0, ext_s1
+-2a8d22e30400         fadd     r3, r7l
++e24112dee78a         ldimm    $r16, 2330451474
+ 01000000000002de     tg_mem_ext 244100171300864
+ 2780068c07028200     simd_lane_mat1 558379797510
++06a80702825f82de     i64_vec_op2 244651529470471
++06aa0702825fa2de     i64_vec_op3 244788968423943
++06ac0702825fc2de     i64_vec_op4 244926407377415
+ 06ae0702825fe2de     i64_alu_mul 245063846330887
++06b00702825f02de     i64_vec_op5 244101773656583
+ e687020a0000         hadd     _, r1l.abs, 0.0, sat, ext_s1
+-2ae122860402         fadd     r24, r17.abs, r68l
+ 2780068e07028200     simd_lane_mat1 558379798022
++06a8070282221ae0     i64_vec_op2 246402852717063
++06a81702822322e0     i64_vec_op2 246437229232663
++06a8070282242ae0     i64_vec_op2 246471605748231
++06a81702822532e0     i64_vec_op2 246505982263831
+ a687120a0000         hadd     _, r9l.abs, 0.0, ext_s1
+-2a9122e10400         fadd     r4, u17l, r7l
++e23f12dee78a         ldimm    $r15.1, 2330451474
+ a689020a0000         hadd     _, r1l.abs, 0.0, ext_s1
++e24512dee78a         ldimm    $r17, 2330451474
+ 2780069207028200     simd_lane_mat1 558379799046
++06aa070282221ade     i64_vec_op3 244203829461511
++06aa1702822322de     i64_vec_op3 244238205977111
++06aa070282242ade     i64_vec_op3 244272582492679
++06aa1702822532de     i64_vec_op3 244306959008279
++e24712dee78a         ldimm    $r17.1, 2330451474
+ 2780069407028200     simd_lane_mat1 558379799558
++06ac070282221ae0     i64_vec_op4 246402852717063
++06ac1702822322e0     i64_vec_op4 246437229232663
++06ac070282242ae0     i64_vec_op4 246471605748231
++06ac1702822532e0     i64_vec_op4 246505982263831
++e24d12dee78a         ldimm    $r19, 2330451474
+ 06ae070282221ae0     i64_alu_mul 246402852717063
+ 06ae1702822322e0     i64_alu_mul 246437229232663
+ 06ae070282242ae0     i64_alu_mul 246471605748231
+ 06ae1702822532e0     i64_alu_mul 246505982263831
++e25112dee78a         ldimm    $r20, 2330451474
++06b0070282221ade     i64_vec_op5 244203829461511
++06b01702822322de     i64_vec_op5 244238205977111
++06b0070282242ade     i64_vec_op5 244272582492679
++06b01702822532de     i64_vec_op5 244306959008279
+ 0f0154ea0100         simd_ballot 125524
+ 0100000000002aa1     tg_mem_ext 177201760698368
+-0f00547ab2ffffff     simd_ballot_8b 281474971630164
++8f0454260f00547a     simd_quad_ext3 134501196834388
+ ff000f0604020000     simd_all_active 33818127
+ 1404                 ret      r2
+-0f005448b2ffffff     simd_ballot_8b 281474971617364
+-0300040000000000     ria_bbox_test 4
++8f0454060f005448     simd_quad_ext3 79525615437396
+ 0001a700545802b4     sys_sync_lane 197922164834471
+ 0600f0100100         i64_alu_ext 69872
+ 1400                 ret      r0
+ 01000f0554050f01     tg_mem_ext 1164025529615
+ 060000000000         i64_alu_ext 0
+-1464                 ret      r50
+ 6702545c15140100     simd_lane_permute2 4631911508
+ 00c008006702         jmp_any  40304648
+ 01005c0802c00800     tg_mem_ext 37581097052
+@@ -177,74 +227,24 @@ ff000f0604020000     simd_all_active 33818127
+ 20802add25812281     sync_fence 141985195613482
+ 0410                 call     r8
+ 208062d925b72681     sync_fence 142003281451362
++2080670254721514     sync_fence 22082344976999
+ 01005c0a04c00800     tg_mem_ext 37581228636
+-22810510208012df     fballot_ext1 245270551990277
+-22810410208022d7     fballot_ext1 236543178444804
++1adf25832281         fmul     r23.1, r52, ext1
++208012df25832281     sync_fence 141985229168402
++208022d725332680     sync_fence 140901555230498
+ fe0c0e0c0000         mov_a    $r3l, 14
+ 0713c20b9a702d80     simd_vec_rd_wide 140932651027394
+ c20302140780         else     0.03125.abs, r24h, 0, cache, fneq, ext1
+-2281051020808ae1     fballot_ext1 247984971321349
+-2281040020801ad9     fballot_ext1 238707841957892
+-228105002080eae3     fballot_ext1 250596311433221
++05002080eae3a587     gmem_fence 149146563149856
++228104002080fad7     fballot_ext1 237470891376644
+ be040e0c0000         ffs      $r1l, 14
+ be02120c0000         ffs      $r0h, 18
+ 8a5e2d80             rcp      $r23h, 0.90625
++c202a25c2d80         else     $r17l.abs.neg, ^r10.1, 0, cache, feq, ext1
+ 0703826267025482     simd_vec_rd_ext 143297329193602
+ 1414                 ret      r10
+ 0800                 trap
++7afb258b22810530     ffma     r126.1, r20, u0.1.abs, sat
+ fe100e0c0000         mov_a    $r4l, 14
++720c2d80             mov      r3l, unk45, ext3
+ c20c520e0780         while    r9.abs.neg, r24l, 1, cache, feq, ext1
+-0703827a62120780     simd_vec_rd_ext 140767861570178
+-0703827c6ad925c3     simd_vec_rd_ext 214567328840834
+-fe0c120c0000         mov_a    $r3l, 18
+-7a7c2d80867d         ffma     r31l, 0.90625, r20l.neg, r30h, sat
+-0703c2006702547e     simd_vec_rd_ext 138899282657474
+-060020808a57         i64_alu_ext 1468694560
+-fe7a0e080000         andn2    $r30h, 14, 0
+-16180000             hmul     r6l, 0.0, 0.0
+-6702547a14148100     simd_lane_permute2 554387667540
+-5a0a2d80             fmul     r2h, 0.90625, 0.125, sat
+-627925992281         ldimm    r30, 2166528293
+-0713c21662d72545     simd_vec_rd_wide 76028829636290
+-161d0000             hmul     _, 0.0, 0.0
+-62702d80             ldimm    r28l, 32813
+-07038274b28a0780     simd_vec_rd_ext 140769880077442
+-07038278aad9e5cf     simd_vec_rd_ext 228586106288258
+-fe761e080000         andn2    $r29h, 30, 0
+-fe760e080000         andn2    $r29h, 14, 0
+-0f028276a257         simd_vote 1470264962
+-fe7412080000         andn2    $r29l, 18, 0
+-0f028276d274         simd_vote 1959949954
+-0f02825ef272         simd_vote 1928486530
+-0f0282621214         simd_vote 336749186
+-1a124d80             fmul     r4h, r6h, 0.125
+-c2082a144d80         if       0.8125.abs, ^r8h.abs, 1, cache, feq, ext1
+-0703c209320e4d80     simd_vec_rd_ext 141068438997442
+-c2023a124d80         else     r29, ^r8h.abs, 0, cache, feq, ext1
+-0703c203420e4d80     simd_vec_rd_ext 141068440044482
+-c2044a104d80         while    r5l, ^r8h.abs, 0, cache, feq, ext1
+-c2006a0a4d80         if       r21.neg, ^r8l.abs, 0, cache, feq, ext1
+-0f02827b8272         simd_vote 1921153922
+-0f02827d0704         simd_vote 67599746
+-09000f0404190f01     st_tile  , 15, 70, 192, u8norm, none, ext0, ext1, ext2, ext3
+-0300b82e120012d9     ria_bbox_test 238671333830328
+-be620e080000         popcnt   $r24h, 14
+-0f028261c704         simd_vote 80175490
+-0f02825e02d9         simd_vote 3640811138
+-0304b82e1200e35c     ria_leaf_test 102130028523192
+-be600e080000         popcnt   $r24l, 14
+-030cb82e1200e35c     ria_subdiv_test 102130028523192
+-0314b82e1200e35c     ria_curve_test 102130028523192
+-be5e0e080000         popcnt   $r23h, 14
+-0318b82e1200e35c     ria_procedural_test 102130028523192
+-031cb82e1200e35c     ria_commit 102130028523192
+-0320b82e1200e35c     ria_abort 102130028523192
+-0324b82e1200e35c     ria_restart 102130028523192
+-0340b82e1200e35c     ria_inst_query 102130028523192
+-a9008f045406         lstore   r0l_r0h, 0, cache, ext1, lsl 1, u8norm, xz
+-0f005470f3ffffff     simd_ballot_8b 281474975887444
+-0500ec88a2000000     gmem_fence 10651884
+-0f05541a4a5d         simd_broadcast 1565137492
+-0700070200000000     simd_vec_op0 519
+-00010f0554290f01     sys_sync_lane 1164629509391
+-d2dca7800682         while    $r19h, r84l, 3, cache, sgt, ext1
+-- 
+2.54.0 (Apple Git-157)
+

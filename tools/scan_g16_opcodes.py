@@ -47,24 +47,10 @@ ARCH_DOMAINS = {
 
 # Patch Mesa disasm to support G16 conventions:
 # 1. G16 encodes unhinted operands with hint=0, while G13/G14 asserted hint==1.
-# 2. Trap unaligned 32/64-bit register indices cleanly without asserting.
 orig_operand = test_disasm.operand
 def g16_operand(desc, length):
     if desc.get('hint') == 0:
         desc['hint'] = 1
-    size = 64 if desc.get('size64', 0) != 0 else 32 if desc.get('size32', 0) != 0 else 16
-    base = desc.get('base')
-    kind = desc.get('kind')
-    count = desc.get('count', 1)
-    if count == 0:
-        count = 4
-    if 'mask' in desc:
-        count = desc['mask'].bit_count()
-    if kind and kind not in ['cf', 'ts', 'ss', 'fimm', 'imm', 'signed'] and size != 16:
-        for offs in range(count):
-            reg = base + (offs * (size // 16))
-            if (reg & 1) != 0:
-                raise ValueError(f"Unaligned register {kind}{reg} for size {size}")
     return orig_operand(desc, length)
 
 test_disasm.operand = g16_operand
@@ -113,12 +99,36 @@ class G16Scanner:
         self.clean_cases = []
         self.exception_cases = []
 
+        # Load manifest symbols if available
+        self.symbol_offsets = {}
+        if self.shader_files:
+            dir_name = os.path.dirname(self.shader_files[0])
+            manifest_p = os.path.join(dir_name, "manifest.json")
+            if os.path.exists(manifest_p):
+                try:
+                    with open(manifest_p) as mf:
+                        m_data = json.load(mf)
+                        for s in m_data.get("shaders", []):
+                            fname = s.get("file")
+                            for sym in s.get("symbols", []):
+                                if sym.get("name") == "_agc.main":
+                                    self.symbol_offsets[fname] = sym.get("offset", 0)
+                                    break
+                except Exception:
+                    pass
+
     def scan_shader(self, filepath: str, max_cases_per_type: int = 15):
         with open(filepath, 'rb') as f:
             code = f.read()
 
         self.stats["total_bytes_scanned"] += len(code)
-        pos = 0
+        fname = os.path.basename(filepath)
+        main_offset = self.symbol_offsets.get(fname, 0)
+        if main_offset > 0 and main_offset < len(code):
+            self.stats["padding_bytes"] += main_offset
+            pos = main_offset
+        else:
+            pos = 0
 
         while pos <= len(code) - 16:
             # Handle zero padding at function or basic block boundaries
