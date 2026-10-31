@@ -39,7 +39,8 @@ asahi-g16-toolkit/
 ├── tools/
 │   ├── extract_g16_metallib.py   # Extracts raw AGX shader code from Universal Fat / Thin Mach-O metallibs
 │   ├── scan_g16_opcodes.py       # Sliding-window disassembler scanner & opcode clustering engine
-│   └── verify_round_trip.py      # Dual bidirectional round-trip verification engine (100% bit-exact pack)
+│   ├── verify_round_trip.py      # Dual bidirectional round-trip verification engine (100% bit-exact pack)
+│   └── check_m1n1_env.py         # m1n1 remote control USB topology & dependency checker
 ├── proposals/
 │   └── AGX2_G16_draft.xml        # Structural XML proposal for G16 instructions in Mesa AGX2.xml
 ├── test/
@@ -59,7 +60,8 @@ asahi-g16-toolkit/
 │   ├── 0012-asahi-Add-Apple-G16-chip-detection-and-compiler-pack.patch
 │   └── 0013-asahi-Add-G16-hardware-barrier-lowering-accurate-dev.patch
 └── docs/
-    └── G16_REVERSE_ENGINEERING_REPORT.md  # Detailed reverse engineering analysis report
+    ├── G16_REVERSE_ENGINEERING_REPORT.md  # Detailed reverse engineering analysis report
+    └── M1N1_REMOTE_CONTROL_GUIDE.md      # Dual-machine m1n1 remote control & hardware GPU debugging guide
 ```
 
 ---
