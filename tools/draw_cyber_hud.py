@@ -24,6 +24,7 @@ if str(M1N1_PATH) not in sys.path:
 os.environ["M1N1DEVICE"] = os.environ.get("M1N1DEVICE", "/dev/ttyACM0")
 
 from m1n1.setup import *
+from m1n1.proxy import IODEV
 
 def log(msg):
     print(f"[*] {msg}")
@@ -236,6 +237,10 @@ def main():
     print("  APPLE M3 PRO (G16) CYBER TEST SCREEN RENDERER")
     print("=" * 78)
 
+    # Disable m1n1 from printing TTY logs onto the framebuffer to prevent console wiping
+    log("Disabling m1n1 framebuffer TTY console (locking display output)...")
+    p.iodev_set_usage(IODEV.FB, 0)
+
     fb_base = u.ba.video.base
     w = u.ba.video.width
     h = u.ba.video.height
@@ -284,7 +289,15 @@ def main():
     print(f"  - Total Frame Data:    {mb_sent:.2f} MiB ({w}x{h} @ 30bpp)")
     print(f"  - USB Stream Time:     {stream_time:.2f} seconds ({rate:.2f} MiB/s)")
     print(f"  - Total Execution:     {time.time() - start_time:.2f} seconds")
-    print("=" * 78 + "\n")
+    print("=" * 78)
+
+    print("[*] Screen persistence lock engaged (m1n1 FB console disabled).")
+    print("[*] Holding proxy connection alive indefinitely. The screen will stay on permanently.")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("[*] Exiting persistence lock.")
 
 if __name__ == "__main__":
     main()
