@@ -251,10 +251,33 @@ def main():
     # Generate full canvas image
     img = create_cyber_hud()
 
-    # Convert to target pixel byte order [B, G, R, A]
-    log("Converting pixel buffer to Liquid Retina XDR BGRA byte stream...")
-    r, g, b, a = img.split()
-    bgra_bytes = Image.merge("RGBA", (b, g, r, a)).tobytes()
+    # Convert to target pixel byte order for Apple 30bpp Liquid Retina XDR
+    # Apple Silicon framebuffer uses 10-bit per channel RGB2101010 (m1n1 rgb2pixel_30)
+    # Mapping: (b << 2) | (g << 12) | (r << 22)
+    log("Packing pixel buffer into Apple 30bpp (10-bit RGB2101010) stream...")
+    try:
+        import numpy as np
+        arr = np.array(img, dtype=np.uint8)
+        r = arr[:, :, 0].astype(np.uint32)
+        g = arr[:, :, 1].astype(np.uint32)
+        b = arr[:, :, 2].astype(np.uint32)
+        # Scale 8-bit to 10-bit with LSB replication for pristine precision
+        b10 = (b << 2) | (b >> 6)
+        g10 = (g << 2) | (g >> 6)
+        r10 = (r << 2) | (r >> 6)
+        pix30 = b10 | (g10 << 10) | (r10 << 20)
+        frame_bytes = pix30.tobytes()
+    except ImportError:
+        # Fallback pure python converter if numpy is absent
+        raw = img.convert("RGBA").tobytes()
+        out = bytearray(len(raw))
+        for i in range(0, len(raw), 4):
+            cr, cg, cb = raw[i], raw[i+1], raw[i+2]
+            b10 = (cb << 2) | (cb >> 6)
+            g10 = (cg << 2) | (cg >> 6)
+            r10 = (cr << 2) | (cr >> 6)
+            struct.pack_into("<I", out, i, b10 | (g10 << 10) | (r10 << 20))
+        frame_bytes = bytes(out)
 
     # Stream to M3 Pro framebuffer in bands of 64 scanlines
     log("Streaming frame to M3 Pro physical framebuffer over USB-C CDC-ACM...")
@@ -272,7 +295,7 @@ def main():
         chunk_size = actual_lines * stride
         dest_addr = fb_base + chunk_offset
 
-        chunk = bgra_bytes[chunk_offset:chunk_offset + chunk_size]
+        chunk = frame_bytes[chunk_offset:chunk_offset + chunk_size]
         iface.writemem(dest_addr, chunk)
 
         if (band_idx + 1) % 5 == 0 or band_idx == total_bands - 1:
@@ -280,7 +303,7 @@ def main():
             print(f"  [>] Streaming progress: {pct:5.1f}% (Lines {line_start:4d} - {line_end:4d})")
 
     t_stream_end = time.time()
-    mb_sent = len(bgra_bytes) / 1024 / 1024
+    mb_sent = len(frame_bytes) / 1024 / 1024
     stream_time = t_stream_end - t_stream_start
     rate = mb_sent / stream_time if stream_time > 0 else 0
 
