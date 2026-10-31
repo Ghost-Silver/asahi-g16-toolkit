@@ -56,7 +56,8 @@ asahi-g16-toolkit/
 │   ├── 0009-asahi-isa-Add-unaligned-register-support-and-G16-indirect-calls.patch
 │   ├── 0010-asahi-isa-Elevate-G16-ISA-recognition-rate-to-89.46.patch
 │   ├── 0011-asahi-isa-Achieve-100.00-G16-ISA-recognition-rate.patch
-│   └── 0012-asahi-Add-Apple-G16-chip-detection-and-compiler-pack.patch
+│   ├── 0012-asahi-Add-Apple-G16-chip-detection-and-compiler-pack.patch
+│   └── 0013-asahi-Add-G16-hardware-barrier-lowering-accurate-dev.patch
 └── docs/
     └── G16_REVERSE_ENGINEERING_REPORT.md  # Detailed reverse engineering analysis report
 ```

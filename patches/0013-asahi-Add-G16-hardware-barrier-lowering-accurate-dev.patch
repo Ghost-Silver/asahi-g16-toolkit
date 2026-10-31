@@ -1,0 +1,118 @@
+From a434ea2f80ed84cd4072900002ed4a36d5397ad9 Mon Sep 17 00:00:00 2001
+From: Ghost-Silver <cyf31415@yeah.net>
+Date: Sat, 31 Oct 2026 13:00:25 +0800
+Subject: [PATCH] asahi: Add G16 hardware barrier lowering, accurate device
+ naming, and Vulkan 64-bit atomic features
+
+- Correct Apple Silicon M-series device name calculation for G16 (Apple M3 / M3 Pro / M3 Max)
+- Support variant 'X' mapping to Pro/Max based on cluster counts
+- Lower global memory and helper exit barriers to G16 native sync_barrier when gpu_generation >= 16
+- Advertise Vulkan shaderBufferInt64Atomics and shaderSharedInt64Atomics on G16
+---
+ src/asahi/compiler/agx_compile.c      | 38 ++++++++++++++++-----------
+ src/asahi/lib/agx_device.c            | 15 ++++++++++-
+ src/asahi/vulkan/hk_physical_device.c |  4 +--
+ 3 files changed, 39 insertions(+), 18 deletions(-)
+
+diff --git a/src/asahi/compiler/agx_compile.c b/src/asahi/compiler/agx_compile.c
+index e131bcf..1fcd0de 100644
+--- a/src/asahi/compiler/agx_compile.c
++++ b/src/asahi/compiler/agx_compile.c
+@@ -1521,16 +1521,20 @@ agx_emit_intrinsic(agx_builder *b, nir_intrinsic_instr *instr)
+              * barriers work.
+              */
+             if (nir_intrinsic_memory_scope(instr) >= SCOPE_QUEUE_FAMILY) {
+-               agx_unknown_barrier_1(b);
+-               agx_memory_barrier_2(b);
+-
+-               /* These are observed on G13D. At some point we should figure out
+-                * what the individual opcodes do.
+-                */
+-               agx_device_barrier_2(b);
+-               agx_unknown_barrier_2(b);
+-               agx_memory_barrier_3(b);
+-               agx_device_barrier_1(b);
++               if (b->shader->key->dev.gpu_generation >= 16) {
++                  agx_sync_barrier(b);
++               } else {
++                  agx_unknown_barrier_1(b);
++                  agx_memory_barrier_2(b);
++
++                  /* These are observed on G13D. At some point we should figure out
++                   * what the individual opcodes do.
++                   */
++                  agx_device_barrier_2(b);
++                  agx_unknown_barrier_2(b);
++                  agx_memory_barrier_3(b);
++                  agx_device_barrier_1(b);
++               }
+             }
+          }
+ 
+@@ -1590,11 +1594,15 @@ agx_emit_intrinsic(agx_builder *b, nir_intrinsic_instr *instr)
+ 
+    case nir_intrinsic_fence_helper_exit_agx: {
+       assert(b->shader->key->is_helper);
+-      agx_memory_barrier(b);
+-      agx_unknown_barrier_1(b);
+-      agx_memory_barrier_2(b);
+-      agx_unknown_barrier_2(b);
+-      agx_memory_barrier_3(b);
++      if (b->shader->key->dev.gpu_generation >= 16) {
++         agx_sync_barrier(b);
++      } else {
++         agx_memory_barrier(b);
++         agx_unknown_barrier_1(b);
++         agx_memory_barrier_2(b);
++         agx_unknown_barrier_2(b);
++         agx_memory_barrier_3(b);
++      }
+       return NULL;
+    }
+ 
+diff --git a/src/asahi/lib/agx_device.c b/src/asahi/lib/agx_device.c
+index 7874baa..0f46241 100644
+--- a/src/asahi/lib/agx_device.c
++++ b/src/asahi/lib/agx_device.c
+@@ -556,9 +556,22 @@ agx_open_device(void *memctx, struct agx_device *dev)
+    case 'D':
+       variant = " Ultra";
+       break;
++   case 'X':
++      variant = (dev->params.num_clusters_total > 2) ? " Max" : " Pro";
++      break;
+    }
++
++   int m_generation;
++   if (dev->params.gpu_generation >= 17) {
++      m_generation = dev->params.gpu_generation - 13;
++   } else if (dev->params.gpu_generation == 16) {
++      m_generation = 3;
++   } else {
++      m_generation = dev->params.gpu_generation - 12;
++   }
++
+    snprintf(dev->name, sizeof(dev->name), "Apple M%d%s (G%d%c %02X)",
+-            dev->params.gpu_generation - 12, variant,
++            m_generation, variant,
+             dev->params.gpu_generation, dev->params.gpu_variant,
+             dev->params.gpu_revision + 0xA0);
+ 
+diff --git a/src/asahi/vulkan/hk_physical_device.c b/src/asahi/vulkan/hk_physical_device.c
+index bbfda00..da3469f 100644
+--- a/src/asahi/vulkan/hk_physical_device.c
++++ b/src/asahi/vulkan/hk_physical_device.c
+@@ -324,8 +324,8 @@ hk_get_device_features(
+       .storageBuffer8BitAccess = true,
+       .uniformAndStorageBuffer8BitAccess = true,
+       .storagePushConstant8 = true,
+-      .shaderBufferInt64Atomics = false,
+-      .shaderSharedInt64Atomics = false,
++      .shaderBufferInt64Atomics = (dev->chip >= AGX_CHIP_G16G),
++      .shaderSharedInt64Atomics = (dev->chip >= AGX_CHIP_G16G),
+       .shaderFloat16 = true,
+       .shaderInt8 = true,
+       .descriptorIndexing = true,
+-- 
+2.54.0 (Apple Git-157)
+
