@@ -7,6 +7,7 @@
 3e0105400f06         intl     r0, 69, ^r90l
 0401                 call     r0, link
 02053e0105402b00     csel     r1, u31l, r8l, r1, ext0, ext2, feq
+09040e0000000600     st_tile  , 14, 0, 0, i8, none, ext1, ext2
 060006000600         i64_alu_ext 393222
 060044a71106         i64_alu_ext 101820228
 5432                 jmp      r25
@@ -43,6 +44,7 @@ aa3d2205             fadd     $r15, u17l.abs, 0.0
 0220200011010040     csel     r8l, 0.5, u8l, r0h, r0l, fgt
 1a642380             fmul     r25l, 0.59375, 0.125
 060004020000         i64_alu_ext 516
+0320200001010040     ria_abort 70368761020448
 9f015442030c         simd_reduce 201540180
 540e                 jmp      r7
 3a52c7002281         ffma     r20h, ^r3h, r16, $r0h
@@ -60,6 +62,7 @@ ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
 4a492205             floor    r18, u17l.abs, sat
 5a44e700             fmul     r17l, ^r19h, 0.0, sat
 5a6a2380             fmul     r26h, 0.59375, 0.125, sat
+0324200001010040     ria_restart 70368761020448
 4a4d2205             floor    r19, u17l.abs, sat
 5a54e700             fmul     r21l, ^r19h, 0.0, sat
 06000c020000         i64_alu_ext 524
@@ -93,12 +96,14 @@ aa512205             fadd     $r20, u17l.abs, 0.0
 010000000000f2dc     tg_mem_ext 242931940196352
 0702825e02dce580     simd_vec_rd 141724727008898
 1702022212dc2780     simd_vec_wr 140908684255746
+69000f060401         lload    , r7h, 0, ext0, u16norm, none
 0f0404190f01         simd_quad_op 17766660
 1402                 ret      r1
 0400                 call     r0
 e681120a0000         hadd     _, r9l.abs, 0.0, sat, ext_s1
 01000000000002e0     tg_mem_ext 246299194556416
 2780068207028200     simd_lane_mat1 558379794950
+69010f060401         lload    , r7h, 0, ext0, u16norm, none
 e683020a0000         hadd     _, r1l.abs, 0.0, sat, ext_s1
 01000000000002e2     tg_mem_ext 248498217811968
 2780068407028200     simd_lane_mat1 558379795462
@@ -131,6 +136,7 @@ a689020a0000         hadd     _, r1l.abs, 0.0, ext_s1
 5add25812281         fmul     r23, u18h, r52, sat, ext1
 0410                 call     r8
 fe0c0e0c0000         mov_a    $r3l, 14
+0713c20b9a702d80     simd_vec_rd_wide 140932651027394
 c20302140780         else     0.03125.abs, r24h, 0, cache, fneq, ext1
 be040e0c0000         ffs      $r1l, 14
 be02120c0000         ffs      $r0h, 18
@@ -147,6 +153,7 @@ fe7a0e080000         andn2    $r30h, 14, 0
 16180000             hmul     r6l, 0.0, 0.0
 0800                 trap
 627925992281         ldimm    r30, 2166528293
+0713c21662d72545     simd_vec_rd_wide 76028829636290
 161d0000             hmul     _, 0.0, 0.0
 62702d80             ldimm    r28l, 32813
 07038274b28a0780     simd_vec_rd_ext 140769880077442
@@ -167,17 +174,25 @@ c2044a104d80         while    r5l, ^r8h.abs, 0, cache, feq, ext1
 c2006a0a4d80         if       r21.neg, ^r8l.abs, 0, cache, feq, ext1
 0f02827b8272         simd_vote 1921153922
 0f02827d0704         simd_vote 67599746
+09000f0404190f01     st_tile  , 15, 70, 192, u8norm, none, ext0, ext1, ext2, ext3
 0300b82e120012d9     ria_bbox_test 238671333830328
 be620e080000         popcnt   $r24h, 14
 0f028261c704         simd_vote 80175490
 0f02825e02d9         simd_vote 3640811138
+0304b82e1200e35c     ria_leaf_test 102130028523192
+be600e080000         popcnt   $r24l, 14
+030cb82e1200e35c     ria_subdiv_test 102130028523192
 0314b82e1200e35c     ria_curve_test 102130028523192
 be5e0e080000         popcnt   $r23h, 14
+0318b82e1200e35c     ria_procedural_test 102130028523192
 031cb82e1200e35c     ria_commit 102130028523192
-be600e080000         popcnt   $r24l, 14
 3a624d808627         ffma     r24h, r6h, r20l.neg, 0.71875
+0320b82e1200e35c     ria_abort 102130028523192
+0324b82e1200e35c     ria_restart 102130028523192
 4a624d80             rcp      r24h, r6h, sat
 62624d80             ldimm    r24h, 32845
+0340b82e1200e35c     ria_inst_query 102130028523192
+a9008f045406         lstore   r0l_r0h, 0, cache, ext1, lsl 1, u8norm, xz
 0f05541a4a5d         simd_broadcast 1565137492
 0700070200000000     simd_vec_op0 519
 d2dca7800682         while    $r19h, r84l, 3, cache, sgt, ext1
@@ -185,66 +200,51 @@ d2dca7800682         while    $r19h, r84l, 3, cache, sgt, ext1
 d262a7800682         else     $r19h, r84l, 0, cache, unk3, ext1
 060017020000         i64_alu_ext 535
 031c210041020010     ria_commit 17592223858721
+0320210041020010     ria_abort 17592223858721
+0324210041020010     ria_restart 17592223858721
 2707022800000000     simd_lane_mat2 10242
 0a0d2b80             rcp      r3, 0.84375
 1e0705200f062401     imadd    dr1, 5, ^r57l, 6.sx, lsl 4
+0340308c11047cff     ria_inst_query 280908109286448
 1e0cff0fa7005410     imsub    r35l, r24, 64.sx, lsl 3
 031c1200f0120500     ria_commit 21792555026
 1e0cff0f27005410     imsub    r35l, r24, 64.sx, lsl 2
 031c3284f0140d00     ria_commit 56185881650
+0318822811012700     ria_procedural_test 167521626242
 031c3200f0120500     ria_commit 21792555058
 2700540e031c1804     simd_lane_mat0 4501595688532
 2f8082100702800e     simd_quad_swz1 15942952620162
 0300002913013b07     ria_bbox_test 7950002497792
 2e00010800000000     shlhi    r0l, 1, 0, 0, 0
+03204e0427055402     ria_abort 2559886951502
 17059f015400030a     simd_vec_sync 11008006685087
 0a045505             floor    r1l, u138h.abs
 03000800e0260a00     ria_bbox_test 43601887240
 2e85020000000000     bfeil    r1, 2, 0, 0, 0
-2e91020000000000     bfeil    r4, 2, 0, 0, 0
+0320062811012705     ria_abort 5665079764998
+030c5c040b012e91     ria_subdiv_test 159626772022364
 03005c044b8a0104     ria_bbox_test 4404661650524
 2f8026a007028000     simd_quad_swz1 549789868070
-0a00f010             rsqrts   r0l, ^r24l
+03040a00f0100100     ria_leaf_test 4579131402
+2f80840e07029f01     simd_quad_swz1 1782445444740
 2888                 doorbell 136
+03040800f0111100     ria_leaf_test 73315385352
 2800                 doorbell 0
+090412053e800402     st_tile  r1l_r1h, 18, 160, 96, explicit_coords, s8norm, xy, ext2
 030020018b020904     ria_bbox_test 4436743880992
 060087020000         i64_alu_ext 647
 6700821000000000     simd_lane_permute 4226
 8410                 call     r8, mode
 2804                 doorbell 4
 8400                 call     r0, mode
-16058a0b             hmul     _, 0.0, ext_s1
+09000f0554010f01     st_tile  r0l_r0h, 15, 64, 192, s8norm, xz, ext0, ext1, ext2, ext3
+0318288816058a0b     ria_procedural_test 12687418755112
 6800                 barrier
 288c                 doorbell 140
 03145c046b0d2ebd     ria_curve_test 208005491262556
-270724a0060392ad     simd_lane_mat2 190842627596324
+03185c0452af2707     ria_procedural_test 7867026506844
 031c2860f0170d00     ria_commit 56236204072
 03145c046b0d2e3d     ria_curve_test 67268002907228
-270724a00603922d     simd_lane_mat2 50105139240996
+03185c04522f2707     ria_procedural_test 7864879023196
 2f3d002400000000     simd_quad_swz2 9216
 28a8                 doorbell 168
-17059f1154040218     simd_vec_sync 26396941619615
-031c10a817059f11     ria_commit 19374682908688
-0440                 call     r32
-17059f1154040318     simd_vec_sync 26401236586911
-16099482             hmul     _, $r10l.abs, 0.125
-2810                 doorbell 16
-1406                 ret      r3
-1426                 ret      r19
-14f8                 ret      r124
-2824                 doorbell 36
-050010040044         load     , dr0, lsl 1, i8, none, a
-050010050044         load     , dr0, 1, lsl 1, i8, none, a
-050010060044         load     , dr0, lsl 1, i8, none, a
-050010070044         load     , dr0, 1, lsl 1, i8, none, a
-0500100c0044         load     , du0, lsl 1, i8, none, a
-0500100d0044         load     , du0, 1, lsl 1, i8, none, a
-0500100e0044         load     , du0, lsl 1, i8, none, a
-8500300f0044         load     , du0, 3, lsl 1, i16, none, a
-2e3d020400000000     extr     r15, 2, 0, 0, 0
-03005c049f015400     ria_bbox_test 360804451420
-27078604060320a0     simd_lane_mat2 176059350123654
-2700544c02544804     simd_lane_mat0 4708693593172
-670054a85a052000     simd_lane_permute 137528780884
-6700444601000000     simd_lane_permute 83524
-670054a45a012000     simd_lane_permute 137461670996
