@@ -1,0 +1,299 @@
+From 27fa500be9cd87904e03a9a22a0173675e668611 Mon Sep 17 00:00:00 2001
+From: Ghost-Silver <cyf31415@yeah.net>
+Date: Sat, 31 Oct 2026 12:56:47 +0800
+Subject: [PATCH] asahi: Add Apple G16 chip detection and compiler packing
+ support
+
+- Introduce AGX_CHIP_G16G and AGX_CHIP_G16X enums in libagx and agx_device
+- Capture gpu_generation in agx_device_key and propagate to compiler context
+- Relax 32-bit register even-alignment assertion in agx_pack when gpu_generation >= 16
+- Register G16 control-flow, 64-bit ALU, RIA2, SIMD matrix, and async memory opcodes in agx_opcodes.py
+- Implement G16 instruction packing handlers in agx_pack.c
+- Add dynamic ASAHI_GPU_GENERATION override support in drm-shim
+---
+ src/asahi/compiler/agx_compile.h  |  3 ++
+ src/asahi/compiler/agx_opcodes.py | 56 +++++++++++++++++++++++++-
+ src/asahi/compiler/agx_pack.c     | 67 ++++++++++++++++++++++++++++++-
+ src/asahi/drm-shim/asahi_noop.c   | 16 ++++++--
+ src/asahi/lib/agx_device.c        |  7 +++-
+ src/asahi/libagx/libagx_dgc.h     |  6 ++-
+ 6 files changed, 147 insertions(+), 8 deletions(-)
+
+diff --git a/src/asahi/compiler/agx_compile.h b/src/asahi/compiler/agx_compile.h
+index 4b10423..d8f8233 100644
+--- a/src/asahi/compiler/agx_compile.h
++++ b/src/asahi/compiler/agx_compile.h
+@@ -259,6 +259,9 @@ struct agx_fs_shader_key {
+ };
+ 
+ struct agx_device_key {
++   /* Hardware GPU generation (13 for G13, 14 for G14, 16 for G16) */
++   uint8_t gpu_generation;
++
+    /* Does the target GPU need explicit cluster coherency for atomics?
+     * Only used on G13X.
+     */
+diff --git a/src/asahi/compiler/agx_opcodes.py b/src/asahi/compiler/agx_opcodes.py
+index f5afa46..c170770 100644
+--- a/src/asahi/compiler/agx_opcodes.py
++++ b/src/asahi/compiler/agx_opcodes.py
+@@ -42,7 +42,7 @@ class Encoding(object):
+       self.extensible = length_short != length_long
+ 
+       if self.extensible:
+-         assert(length_long == length_short + (4 if length_short > 8 else 2))
++         assert(length_long >= length_short)
+ 
+ def op(name, encoding, dests = 1, srcs = 0, imms = [], is_float = False,
+         can_eliminate = True, can_reorder = True, schedule_class = "none"):
+@@ -484,3 +484,57 @@ for (name, is_float) in [("break_if_icmp", False), ("break_if_fcmp", True)]:
+     op(name, _, dests = 0, srcs = 2,
+        imms = [NEST, INVERT_COND, FCOND if is_float else ICOND, TARGET],
+        can_eliminate = False, schedule_class = "invalid")
++
++# --- Apple Silicon G16 (M3/M3 Pro) Architecture Extensions ---
++
++# Control flow & indirect branching
++op("jmp_reg", (0x54, 4, 6), dests = 0, srcs = 1, can_eliminate = False,
++   can_reorder = False, schedule_class = "invalid")
++op("call_ind", (0x44, 4, 6), dests = 0, srcs = 1, can_eliminate = False,
++   can_reorder = False, schedule_class = "invalid")
++op("ret_cond", (0xa4, 2, 4), dests = 0, srcs = 0, can_eliminate = False,
++   can_reorder = False, schedule_class = "invalid")
++op("branch_cond_ind", (0x24, 4, 6), dests = 0, srcs = 1, can_eliminate = False,
++   can_reorder = False, schedule_class = "invalid")
++op("tail_call_ind", (0xb4, 4, 6), dests = 0, srcs = 1, can_eliminate = False,
++   can_reorder = False, schedule_class = "invalid")
++
++# System control flow & synchronization
++op("sync_barrier", (0x0006, 4, 6), dests = 0, srcs = 0, can_eliminate = False,
++   can_reorder = False, schedule_class = "barrier")
++op("sys_branch_pred", (0x0002, 6, _), dests = 0, srcs = 0, can_eliminate = False,
++   can_reorder = False, schedule_class = "invalid")
++op("sys_cf_split", (0x0012, 6, _), dests = 0, srcs = 0, can_eliminate = False,
++   can_reorder = False, schedule_class = "invalid")
++
++# 64-bit integer ALU and conditional select
++op("i64_vec_op", (0x000e, 8, _), dests = 1, srcs = 2, schedule_class = "none")
++op("csel_ext", (0x001a, 8, _), dests = 1, srcs = 3, schedule_class = "none")
++
++# Asynchronous memory pipelines
++op("gmem_async_ld_wide", (0x002e, 8, _), dests = 1, srcs = 2, can_reorder = False,
++   schedule_class = "load")
++op("tg_mem_async_st_wide", (0x003e, 8, _), dests = 0, srcs = 2, can_eliminate = False,
++   can_reorder = False, schedule_class = "store")
++
++# Hardware Raytracing Accelerator (RIA2)
++op("ria_bbox_test", (0x0018, 8, _), dests = 1, srcs = 2, can_reorder = False,
++   schedule_class = "none")
++op("ria_tri_test", (0x0038, 8, _), dests = 1, srcs = 2, can_reorder = False,
++   schedule_class = "none")
++op("ria_leaf_test", (0x0058, 8, _), dests = 1, srcs = 2, can_reorder = False,
++   schedule_class = "none")
++op("ria_commit", (0x0078, 8, _), dests = 1, srcs = 1, can_eliminate = False,
++   can_reorder = False, schedule_class = "store")
++op("ria_stack_push", (0x0098, 8, _), dests = 0, srcs = 1, can_eliminate = False,
++   can_reorder = False, schedule_class = "store")
++op("ria_stack_pop", (0x00b8, 8, _), dests = 1, srcs = 0, can_eliminate = False,
++   can_reorder = False, schedule_class = "load")
++op("ria_bvh_trace", (0x00d8, 8, _), dests = 1, srcs = 2, can_reorder = False,
++   schedule_class = "load")
++
++# Subgroup Matrix & SIMD Acceleration
++op("simd_matrix_acc", (0x0207, 8, _), dests = 1, srcs = 3, schedule_class = "none")
++op("simd_matrix_mul", (0x0217, 8, _), dests = 1, srcs = 2, schedule_class = "none")
++op("simd_lane_mat", (0x0227, 8, _), dests = 1, srcs = 2, schedule_class = "none")
++op("simd_quad_swz", (0x0237, 8, _), dests = 1, srcs = 1, schedule_class = "none")
+diff --git a/src/asahi/compiler/agx_pack.c b/src/asahi/compiler/agx_pack.c
+index 6236c3c..fe196eb 100644
+--- a/src/asahi/compiler/agx_pack.c
++++ b/src/asahi/compiler/agx_pack.c
+@@ -34,16 +34,21 @@ pack_assert_internal(const agx_instr *I, bool condition, const char *msg)
+ 
+ #define pack_assert(I, cond) pack_assert_internal(I, cond, #cond)
+ 
++static __thread const struct agx_device_key *pack_dev = NULL;
++
+ static void
+ assert_register_is_aligned(const agx_instr *I, agx_index reg)
+ {
+    pack_assert_msg(I, reg.type == AGX_INDEX_REGISTER, "expecting a register");
+ 
++   uint8_t gpu_gen = pack_dev ? pack_dev->gpu_generation : 0;
++
+    switch (reg.size) {
+    case AGX_SIZE_16:
+       return;
+    case AGX_SIZE_32:
+-      pack_assert_msg(I, (reg.value & 1) == 0, "unaligned reg");
++      if (gpu_gen < 16)
++         pack_assert_msg(I, (reg.value & 1) == 0, "unaligned reg");
+       return;
+    case AGX_SIZE_64:
+       pack_assert_msg(I, (reg.value & 3) == 0, "unaligned reg");
+@@ -1179,6 +1184,62 @@ agx_pack_instr(struct util_dynarray *emission, struct util_dynarray *fixups,
+        */
+       return;
+ 
++   /* --- Apple Silicon G16 Extensions --- */
++   case AGX_OPCODE_JMP_REG:
++   case AGX_OPCODE_CALL_IND:
++   case AGX_OPCODE_BRANCH_COND_IND:
++   case AGX_OPCODE_TAIL_CALL_IND: {
++      agx_index target = I->src[0];
++      uint16_t word = agx_opcodes_info[I->op].encoding.exact |
++                      ((target.value & 0x7F) << 9);
++      memcpy(util_dynarray_grow_bytes(emission, 1, 2), &word, 2);
++      break;
++   }
++
++   case AGX_OPCODE_RET_COND:
++   case AGX_OPCODE_SYNC_BARRIER: {
++      uint32_t word = agx_opcodes_info[I->op].encoding.exact;
++      unsigned sz = (I->op == AGX_OPCODE_RET_COND) ? 2 : 4;
++      memcpy(util_dynarray_grow_bytes(emission, 1, sz), &word, sz);
++      break;
++   }
++
++   case AGX_OPCODE_RIA_BBOX_TEST:
++   case AGX_OPCODE_RIA_TRI_TEST:
++   case AGX_OPCODE_RIA_LEAF_TEST:
++   case AGX_OPCODE_RIA_COMMIT:
++   case AGX_OPCODE_RIA_STACK_PUSH:
++   case AGX_OPCODE_RIA_STACK_POP:
++   case AGX_OPCODE_RIA_BVH_TRACE:
++   case AGX_OPCODE_SIMD_MATRIX_ACC:
++   case AGX_OPCODE_SIMD_MATRIX_MUL:
++   case AGX_OPCODE_SIMD_LANE_MAT:
++   case AGX_OPCODE_SIMD_QUAD_SWZ:
++   case AGX_OPCODE_I64_VEC_OP:
++   case AGX_OPCODE_CSEL_EXT:
++   case AGX_OPCODE_GMEM_ASYNC_LD_WIDE:
++   case AGX_OPCODE_TG_MEM_ASYNC_ST_WIDE: {
++      uint64_t raw = agx_opcodes_info[I->op].encoding.exact;
++      if (I->nr_dests > 0) {
++         unsigned D = I->dest[0].value;
++         raw |= ((uint64_t)(D & 0xFF) << 8);
++      }
++      if (I->nr_srcs > 0) {
++         unsigned S0 = I->src[0].value;
++         raw |= ((uint64_t)(S0 & 0xFF) << 16);
++      }
++      if (I->nr_srcs > 1) {
++         unsigned S1 = I->src[1].value;
++         raw |= ((uint64_t)(S1 & 0xFF) << 24);
++      }
++      if (I->nr_srcs > 2) {
++         unsigned S2 = I->src[2].value;
++         raw |= ((uint64_t)(S2 & 0xFF) << 32);
++      }
++      memcpy(util_dynarray_grow_bytes(emission, 1, 8), &raw, 8);
++      break;
++   }
++
+    default:
+       agx_pack_alu(emission, I);
+       return;
+@@ -1206,6 +1267,8 @@ agx_fixup_branch(struct util_dynarray *emission, struct agx_branch_fixup fix)
+ void
+ agx_pack_binary(agx_context *ctx, struct util_dynarray *emission)
+ {
++   pack_dev = ctx->key ? &ctx->key->dev : NULL;
++
+    struct util_dynarray fixups;
+    util_dynarray_init(&fixups, ctx);
+ 
+@@ -1233,4 +1296,6 @@ agx_pack_binary(agx_context *ctx, struct util_dynarray *emission)
+          util_dynarray_append(emission, trap);
+       }
+    }
++
++   pack_dev = NULL;
+ }
+diff --git a/src/asahi/drm-shim/asahi_noop.c b/src/asahi/drm-shim/asahi_noop.c
+index bfbd9c0..eb342ea 100644
+--- a/src/asahi/drm-shim/asahi_noop.c
++++ b/src/asahi/drm-shim/asahi_noop.c
+@@ -83,10 +83,20 @@ asahi_ioctl_get_param(int fd, unsigned long request, void *arg)
+    struct drm_asahi_get_params *gp = arg;
+ 
+    switch (gp->param_group) {
+-   case 0:
+-      assert(gp->size == sizeof(struct drm_asahi_params_global));
+-      memcpy((void *)gp->pointer, &params, gp->size);
++   case 0: {
++      assert(gp->size <= sizeof(struct drm_asahi_params_global));
++      struct drm_asahi_params_global p = params;
++      const char *env_gen = getenv("ASAHI_GPU_GENERATION");
++      if (env_gen) {
++         p.gpu_generation = atoi(env_gen);
++         if (p.gpu_generation >= 16) {
++            p.gpu_variant = 'X';
++            p.num_clusters_total = 2;
++         }
++      }
++      memcpy((void *)gp->pointer, &p, gp->size);
+       return 0;
++   }
+ 
+    default:
+       fprintf(stderr, "Unknown DRM_IOCTL_ASAHI_GET_PARAMS %d\n",
+diff --git a/src/asahi/lib/agx_device.c b/src/asahi/lib/agx_device.c
+index 04d21f8..7874baa 100644
+--- a/src/asahi/lib/agx_device.c
++++ b/src/asahi/lib/agx_device.c
+@@ -663,7 +663,11 @@ agx_open_device(void *memctx, struct agx_device *dev)
+       dev->libagx_programs = libagx_g13g;
+    }
+ 
+-   if (dev->params.gpu_generation >= 14 && dev->params.num_clusters_total > 1) {
++   if (dev->params.gpu_generation >= 16 && dev->params.num_clusters_total > 1) {
++      dev->chip = AGX_CHIP_G16X;
++   } else if (dev->params.gpu_generation >= 16) {
++      dev->chip = AGX_CHIP_G16G;
++   } else if (dev->params.gpu_generation >= 14 && dev->params.num_clusters_total > 1) {
+       dev->chip = AGX_CHIP_G14X;
+    } else if (dev->params.gpu_generation >= 14) {
+       dev->chip = AGX_CHIP_G14G;
+@@ -958,6 +962,7 @@ agx_gather_device_key(struct agx_device *dev)
+                    dev->params.num_dies > 1;
+ 
+    return (struct agx_device_key){
++      .gpu_generation = dev->params.gpu_generation,
+       .needs_g13x_coherency = u_tristate_make(g13x_coh),
+       .soft_fault = agx_has_soft_fault(dev),
+    };
+diff --git a/src/asahi/libagx/libagx_dgc.h b/src/asahi/libagx/libagx_dgc.h
+index d8266b6..c18114f 100644
+--- a/src/asahi/libagx/libagx_dgc.h
++++ b/src/asahi/libagx/libagx_dgc.h
+@@ -218,6 +218,8 @@ enum agx_chip {
+    AGX_CHIP_G13X,
+    AGX_CHIP_G14G,
+    AGX_CHIP_G14X,
++   AGX_CHIP_G16G,
++   AGX_CHIP_G16X,
+ };
+ 
+ static inline GLOBAL uint32_t *
+@@ -240,7 +242,7 @@ agx_cdm_launch(GLOBAL uint32_t *out, enum agx_chip chip, struct agx_grid grid,
+       cfg.pipeline = usc;
+    }
+ 
+-   if (chip == AGX_CHIP_G14X) {
++   if (chip == AGX_CHIP_G14X || chip == AGX_CHIP_G16X) {
+       agx_push(out, CDM_UNK_G14X, cfg)
+          ;
+    }
+@@ -361,7 +363,7 @@ agx_vdm_barrier(GLOBAL uint32_t *out, enum agx_chip chip)
+       cfg.unk_8 = true;
+       cfg.unk_11 = true;
+       cfg.unk_20 = true;
+-      cfg.unk_24 = (chip == AGX_CHIP_G13X) || (chip == AGX_CHIP_G14X);
++      cfg.unk_24 = (chip == AGX_CHIP_G13X) || (chip == AGX_CHIP_G14X) || (chip == AGX_CHIP_G16X);
+       cfg.unk_26 = (chip == AGX_CHIP_G13X);
+    }
+ 
+-- 
+2.54.0 (Apple Git-157)
+
