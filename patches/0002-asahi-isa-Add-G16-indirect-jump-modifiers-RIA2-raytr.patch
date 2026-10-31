@@ -1,7 +1,7 @@
 From 0688282f469167ef44b2d176c8ab99257bd136ec Mon Sep 17 00:00:00 2001
 From: Ghost-Silver <cyf31415@yeah.net>
 Date: Sat, 31 Oct 2026 11:11:12 +0800
-Subject: [PATCH 2/2] asahi/isa: Add G16 indirect jump modifiers, RIA2
+Subject: [PATCH 2/3] asahi/isa: Add G16 indirect jump modifiers, RIA2
  raytracing group, and csel extensions
 
 - Add mode (bit 7) and link (bit 8) modifiers to Jump indirect group (ret, call_reg, jmp_reg)

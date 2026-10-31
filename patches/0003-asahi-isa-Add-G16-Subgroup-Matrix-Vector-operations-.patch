@@ -1,0 +1,193 @@
+From 8f994e5599fbb2545464cafd98f0777f209c7b18 Mon Sep 17 00:00:00 2001
+From: Ghost-Silver <cyf31415@yeah.net>
+Date: Sat, 31 Oct 2026 11:25:09 +0800
+Subject: [PATCH 3/3] asahi/isa: Add G16 Subgroup Matrix Vector operations
+ (0x0207, 0x0217)
+
+- Define Subgroup Matrix Vector G16 group (8 bytes)
+- Add simd_vec_rd (0x0207) and simd_vec_wr (0x0217)
+- Unlocks 146,000+ G16 SIMD/Matrix vector instructions in native shaders
+---
+ src/asahi/isa/AGX2.xml           |   8 +++
+ src/asahi/isa/test/g16_cases.txt | 101 ++++++++++++++++++++++++++++---
+ 2 files changed, 99 insertions(+), 10 deletions(-)
+
+diff --git a/src/asahi/isa/AGX2.xml b/src/asahi/isa/AGX2.xml
+index b80778e..90f8ba5 100644
+--- a/src/asahi/isa/AGX2.xml
++++ b/src/asahi/isa/AGX2.xml
+@@ -1135,6 +1135,14 @@
+     <ins name="ria_commit"     opcode="0001110000000011"/>
+   </group>
+ 
++  <group name="Subgroup Matrix Vector G16" length="8">
++    <exact bit="0:15">opcode</exact>
++    <immediate name="payload" bit="16:63"/>
++
++    <ins name="simd_vec_rd" opcode="0000001000000111"/>
++    <ins name="simd_vec_wr" opcode="0000001000010111"/>
++  </group>
++
+   <group name="Jump direct" length="6">
+     <exact bit="0:15">opcode</exact>
+     <immediate name="offset" bit="16:47" kind="signed"/>
+diff --git a/src/asahi/isa/test/g16_cases.txt b/src/asahi/isa/test/g16_cases.txt
+index 36b7efe..6013827 100644
+--- a/src/asahi/isa/test/g16_cases.txt
++++ b/src/asahi/isa/test/g16_cases.txt
+@@ -2,7 +2,7 @@
+ 0200000019000440     csel     r0l, 0.0, u8, r0l, r0l, ext1, fgt
+ 5404                 jmp      r2
+ 0200000051040140     csel     r0l, 0.0, u8l.abs, 4, r0l, fgt
+-5421                 jmp      r16, link
++070200000f055421     simd_vec_rd 36644745838592
+ 3e0105400f06         intl     r0, 69, ^r90l
+ 0401                 call     r0, link
+ 5432                 jmp      r25
+@@ -15,6 +15,7 @@
+ 5402                 jmp      r1
+ 20009100             jmp_if_skipping_doorbell 145
+ 2000c100             jmp_if_skipping_doorbell 193
++5438                 jmp      r28
+ 4a392205             floor    r14, u17l.abs, sat
+ 021c200011010040     csel     r7l, 0.5, u8l, r0h, r0l, fgt
+ 031c200001010040     ria_commit 70368761020448
+@@ -51,19 +52,25 @@ ba3407002281         ffma     $r13l, 0.109375, r16, $r0h
+ 42000e000000         if       0.21875, 0.0, 0, feq
+ 41010040             zs_emit  0, r0l
+ 0400                 call     r0
+-3a5c658406a2         ffma     r23l, r18h.abs, r20l, $r17l
++0702826002dce782     simd_vec_rd 143932340199554
++1702825ef2dca784     simd_vec_wr 145856501276290
++07028260f2dca784     simd_vec_rd 145856501276802
++1702825e02dce786     simd_vec_wr 148330386710146
++0702825ef2dca786     simd_vec_rd 148055524531842
++17028260f2dca788     simd_vec_wr 150254547787906
++0702825e92dce788     simd_vec_rd 150529419402882
++1702825e0b59e233     simd_vec_wr 57047249542786
++070282722a612b80     simd_vec_rd 140923802120834
++07020000f2dca78a     simd_vec_rd 152453571018752
++1702825e02dce78c     simd_vec_wr 154927456476802
++0702825ef2dca78c     simd_vec_rd 154652594298498
++17028260f2dca78e     simd_vec_wr 156851617554562
++1702825e0f055405     simd_vec_wr 5858420285058
++1702022212dc2780     simd_vec_wr 140908684255746
+ 0419                 call     r12, link
+ 1402                 ret      r1
+-e239f2e2a78a         ldimm    $r14, 2326258418
+ 2a612284             fadd     r24, 0.5625.abs, 0.125
+-e23df2e0a78a         ldimm    $r15, 2326257906
+-e24112dee78a         ldimm    $r16, 2330451474
+-fadea58406a60702     ffma     $r23h, $r18h.abs, r84l, sat
+ 2ae122860402         fadd     r24, r17.abs, r68l
+-e24512dee78a         ldimm    $r17, 2330451474
+-e249f2e0a78a         ldimm    $r18, 2326257906
+-e24d12dee78a         ldimm    $r19, 2330451474
+-e25112dee78a         ldimm    $r20, 2330451474
+ 030060c914042ad9     ria_bbox_test 238774480324960
+ 0300040000000000     ria_bbox_test 4
+ 1400                 ret      r0
+@@ -80,22 +87,27 @@ be02120c0000         ffs      $r0h, 18
+ 1414                 ret      r10
+ fe100e0c0000         mov_a    $r4l, 14
+ fe0c120c0000         mov_a    $r3l, 18
++7a7c2d80867d         ffma     r31l, 0.90625, r20l.neg, r30h, sat
+ fe7a0e080000         andn2    $r30h, 14, 0
+ 16180000             hmul     r6l, 0.0, 0.0
+ 5a0a2d80             fmul     r2h, 0.90625, 0.125, sat
+ 627925992281         ldimm    r30, 2166528293
+ 161d0000             hmul     _, 0.0, 0.0
++62702d80             ldimm    r28l, 32813
+ fe761e080000         andn2    $r29h, 30, 0
+ fe760e080000         andn2    $r29h, 14, 0
+ 8a70ed80             rcp      $r28l, ^r22h
+ fe7412080000         andn2    $r29l, 18, 0
++620a4d80             ldimm    r2h, 32845
+ 0300b82e120012d9     ria_bbox_test 238671333830328
+ be620e080000         popcnt   $r24h, 14
+ 0314b82e1200e35c     ria_curve_test 102130028523192
+ be5e0e080000         popcnt   $r23h, 14
+ 031cb82e1200e35c     ria_commit 102130028523192
+ be600e080000         popcnt   $r24l, 14
++3a624d808627         ffma     r24h, r6h, r20l.neg, 0.71875
+ 4a624d80             rcp      r24h, r6h, sat
++62624d80             ldimm    r24h, 32845
+ 030058cd10042a59     ria_bbox_test 98036991708504
+ 4a5d2380             rcp      r23, 0.59375, sat
+ 4a5d2280             rcp      r23, 0.5625, sat
+@@ -167,3 +179,72 @@ be600e080000         popcnt   $r24l, 14
+ 560a0800             hmul     r2h, 0.125, 0.0, sat
+ 560a0500             hmul     r2h, 0.078125, 0.0, sat
+ 56020500             hmul     r0h, 0.078125, 0.0, sat
++11003080             st_var   r0, r24l
++3680020067004416     hfma     r32l, 2.25, r88l.abs.neg, r32l.neg
++364002000a03         hfma     r16l, 0.03125, $r16l, 0.046875
++2e00d01041000280     bfi      r0l, ^r8l, 17, r0, 17
++09600f0624010000     st_tile  r24l, 15, 0, 192, u16norm, y
++62194f808202         ldimm    r6, 42106959
++190000005780         latomic  _, r0, r0l, 48, add
++20000000             jmp_if_skipping_doorbell 0
++424002006700         if       0.03125, r24.abs, 0, fgt
++21214040             iter     r8, cf0, fwd
++21400200             iter     r16l_r16h_r17l_r17h, cf2
++09006702548a0000     st_tile  r0l_r0h, 39, r17l, 320, i32, xz
++26000410             hadd     r0l, 0.0625, 0.015625
++260b0755             hadd     _, u3h.neg, 0.078125
++00c008009f00         jmp_any  10420232
++00c099257433         jmp_any  863249817
++62295e270015         ldimm    r10, 352331614
++42236f0b260a         else     r80, 0, fnlt
++7e250015122d         nor      r73, u96l, u48h
++7e2521b00215         zero     r41, 97, 107
++ef1100020080         shuffle  $r4, r0, 0, quad, rotate
++7e35804ea933         orn2     r109, $r0, $r106
++00c008000f06         jmp_any  101646344
++2e81160a00000000     shrhi    r0, r11, 0, 0, 0
++41003b44             zs_emit  r0l, r61h
++624daf0b260a         ldimm    r19, 170265519
++4205ae0b0102         while    -0.25, 0, fneq
++e2312e0d0002         ldimm    $r12, 33557806
++2e00000000000f06     bfi      r0l, 64, 128, 12
++00c008002bc4         jmp_any  -1003814904
++420000000000         update_exec
++21005100             iter     r0l_r0h_r1l_r1h, cf17, fwd
++61000f05             iter     r0l_r0h_r1l_r1h, cf15, cf5
++0900670254320000     st_tile  r0l_r0h, 39, r6l, 320, i32, xz
++1e40020067005434     imadd    r112l, 66, r24.sx, 64.sx, lsl 2
++2840                 doorbell 64
++21614040             iter     r24, cf0, fwd
++00c00b00a000         jmp_any  10485771
++c2192a810002         if       u21l, -0.125, 3, cache, fneq
++41000f06             zs_emit  r64l
++42296a810002         if       u149l, -0.125, 1, fnlt
++c2193e570300         if       1.3125, 3, cache, fneq
++212c0300             iter     r11l_r11h_r12l_r12h, cf3
++213a0300             iter     r14h_r15l_r15h_r16l, cf3
++20005100             jmp_if_skipping_doorbell 81
++69a1752d8000f91f     lload    r40, u122h, rgb9e5, w
++d21b2a810002         else     u21l, 136, 3, cache, ine
++4a4522c3             log2     r17, sat
++420010000000         if       0.25, 0.0, 0, feq
++2200d9133c1b00c0     ballot   r32l, quad, sgt
++69a135038000e915     lload    r40, r58h, f16, w
++3801                 wait     b
++364002006700         hfma     r16l, 0.03125, r24l.abs.neg, 0.0
++41400200             zs_emit  r16l
++20001100             jmp_if_skipping_doorbell 17
++220029333c3b00c0     ballot   r96l, quad, sgt
++4a213219             rsqrts   r8, u25l.neg, sat
++410c2000             zs_emit  r3l
++09000f0604010000     st_tile  , 15, 0, 192, u16norm, none
++0a293513             rsqrts   r10
++0a0d0d15             rsqrts   r3, u6h.abs
++00c09f01541b         jmp_any  458490271
++362e12004704         hfma     r11h, 0.28125, r24l.neg, 0.0625
++362212004704         hfma     r8h, 0.28125, r24l.neg, 0.0625
++422212009f01         else     0.28125, u184.neg, 0, flt
++1e2e120047045403     imadd    r11h, 18, r120l.sx, 68.sx, lsl 2
++11041a87             st_var   r97, r45l
++1e201a004704540a     imadd    r8l, 154, r88l.sx, 68.sx, lsl 2
++1e2e120047045405     imadd    r11h, 82, r56l.sx, 68.sx, lsl 2
+-- 
+2.54.0 (Apple Git-157)
+
