@@ -41,7 +41,8 @@ asahi-g16-toolkit/
 │   ├── scan_g16_opcodes.py       # Sliding-window disassembler scanner & opcode clustering engine
 │   ├── verify_round_trip.py      # Dual bidirectional round-trip verification engine (100% bit-exact pack)
 │   ├── check_m1n1_env.py         # m1n1 remote control USB topology & dependency checker
-│   └── test_m3pro_baremetal.py   # Live bare-metal hardware MMIO, P-States, UAT & G16 shader test runner
+│   ├── test_m3pro_baremetal.py   # Live bare-metal hardware MMIO, P-States, UAT & G16 shader test runner
+│   └── draw_cyber_hud.py         # 3024x1964 Liquid Retina XDR cybernetic telemetry test screen renderer
 ├── proposals/
 │   └── AGX2_G16_draft.xml        # Structural XML proposal for G16 instructions in Mesa AGX2.xml
 ├── test/
