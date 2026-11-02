@@ -10,7 +10,10 @@ A reverse engineering toolchain, automated ISA scanner, and Mesa bring-up test s
 Developed as part of the initiative to bring full Linux support (including Arch Linux ARM + Wayland/Niri desktop) to Apple Silicon M3 hardware.
 
 ---
-
+## ⚠️ AI / LLM Usage Disclosure
+This project, its associated scripts, test cases, and experimental Mesa patches were developed with the assistance of Large Language Models (LLMs) for automated code scaffolding, documentation drafting, and experimental ISA analysis.
+The findings are intended purely as experimental reverse-engineering notes and community exploration. They have not been independently validated on bare metal by the Asahi Linux team and should not be considered ready for upstream production use.
+    
 ## 🌟 Highlights & Key Breakthroughs
 
 1. **100.00% ISA Recognition Milestone**:
